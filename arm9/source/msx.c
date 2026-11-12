@@ -34,7 +34,6 @@ u8 bRAMInPage[4]            __attribute__((section(".dtcm"))) = {0,0,0,0};
 u8 *MSXCartPtr[2][8]        __attribute__((section(".dtcm"))) = { {0,0,0,0,0,0,0,0}, {0,0,0,0,0,0,0,0} };
 u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
-u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;      // True if game is making use of SCC / SCC+
 u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;      // True if game is making use of MSX-MUSIC (YM Sound)
 u8 special_memory_access    __attribute__((section(".dtcm"))) = 0x00;   // This lets us know we've got something special mapped into memory
 u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;      // If we cross a threshold, we decare we are MSX-MUSIC capable (and mix in the proper sound)
@@ -257,13 +256,13 @@ void write_port_E5(u8 Value)
 
             // Only bits 5 and 6 are writable.
             s1990_reg6 = Value & 0x60;
-            
+
             // Update active CPU selection.
             s1990_is_r800 = (s1990_reg6 & 0x40) != 0;
-            
+
             extern u8 turbo_r_boost;
             turbo_r_boost = s1990_is_r800;
-            
+
             break;
 
         default:
@@ -473,232 +472,20 @@ u8 readport_keyboard(void)
       return ~key1;
 }
 
-// --------------------------------------------------------------------
-// Arkanoid Vaus paddle
-//
-// Joystick port 1:
-//
-//   Pin 1 = serial DATA  -> PSG R#14 bit 0
-//   Pin 2 = FIRE         -> PSG R#14 bit 1
-//   Pin 6 = CLOCK        -> PSG R#15 bit 0
-//   Pin 8 = RESET/START  -> PSG R#15 bit 4
-//
-// Vaus sends 9 bits, MSB first.
-//
-// Sequence:
-//
-//   pin8 LOW -> HIGH       start conversion
-//   wait
-//   read bit 8
-//   pin6 LOW -> HIGH       shift
-//   read bit 7
-//   pin6 LOW -> HIGH       shift
-//   ...
-//
-// Pin 8 is HIGH for the first clock, then LOW for the remaining clocks.
-// --------------------------------------------------------------------
-ArkanoidPaddle myPaddle;
-
-// -------------------------------------------------------------------------------
-// Experimentally determined that 0-290 is about the usable range in both
-// Arkanoid games which are the only games known to use the paddles. Good enough..
-// -------------------------------------------------------------------------------
-void update_arkanoid_paddle_position(u8 clockwise, u8 speed)
-{
-    if (clockwise)
-    {
-        myPaddle.current_position += speed;
-        if (myPaddle.current_position > 290) myPaddle.current_position = 290;
-    }
-    else
-    {
-        if (myPaddle.current_position > speed) myPaddle.current_position -= speed;
-        else myPaddle.current_position = 0;
-    }
-}
-
-// --------------------------------------------------------------------
-// Arkanoid Vaus paddle
-//
-// Joystick port 1:
-//
-//   Pin 1 = DATA  -> PSG R#14 bit 0
-//   Pin 2 = FIRE  -> PSG R#14 bit 1, active LOW
-//   Pin 6 = CLOCK -> PSG R#15 bit 0
-//   Pin 8 = START -> PSG R#15 bit 4, active LOW pulse
-//
-// Vaus protocol:
-//
-//   pin 8 LOW  = start a new conversion
-//   pin 8 HIGH = keep conversion result available
-//
-//   read DATA
-//   pin 6 LOW
-//   pin 6 HIGH
-//   read DATA
-//   ... nine bits total
-//
-// The first 9-bit result after a pin-8 conversion is what we present
-// to the game. We emulate the Vaus conversion instantaneously.
-// --------------------------------------------------------------------
-
-// --------------------------------------------------------------------
-// Start a new Vaus conversion.
-//
-// IMPORTANT:
-// The Vaus is triggered by the FALLING edge of pin 8.
-// --------------------------------------------------------------------
-static void arkanoid_start_conversion(ArkanoidPaddle *paddle)
-{
-    uint16_t pos = paddle->current_position;
-
-    /*
-     * Our experimentally calibrated range.
-     *
-     * 150 -> left edge
-     * 305 -> right edge
-     */
-    paddle->shift_register = 150 + ((pos * 145) >> 8);
-
-    paddle->shift_register &= 0x01FF;
-}
-
-
-// --------------------------------------------------------------------
-// Update Vaus control lines
-// --------------------------------------------------------------------
-static void update_arkanoid_paddle(ArkanoidPaddle *paddle,
-                                   uint8_t pin6,
-                                   uint8_t pin8)
-{
-    /*
-     * Pin 8 FALLING edge starts a new conversion.
-     *
-     * Do NOT do anything on the rising edge.
-     *
-     * This is important because pin 8 is supposed to remain HIGH
-     * while the paddle result is being read.
-     */
-    if (!pin8 && paddle->last_pin8_state)
-    {
-        arkanoid_start_conversion(paddle);
-    }
-
-    /*
-     * Pin 6 rising edge shifts the serial register.
-     *
-     * The game reads the current bit BEFORE generating this pulse.
-     *
-     * So:
-     *
-     *     R14 read -> current bit
-     *     pin6 LOW
-     *     pin6 HIGH -> advance to next bit
-     */
-    if (pin6 && !paddle->last_pin6_state)
-    {
-        paddle->shift_register <<= 1;
-    }
-
-    paddle->last_pin6_state = pin6;
-    paddle->last_pin8_state = pin8;
-}
-
-
-// --------------------------------------------------------------------
-// Read Vaus serial data.
-//
-// IMPORTANT: Reading does NOT shift the register.
-// Pin 6 does that.
-// --------------------------------------------------------------------
-static bool read_paddle_pin1(ArkanoidPaddle *paddle)
-{
-    return (paddle->shift_register & 0x0100) != 0;
-}
-
-
-// --------------------------------------------------------------------
-// PSG Port B output
-// --------------------------------------------------------------------
-void ayPortBOutHandler(u8 value)
-{
-    /*
-     * Bit 6 selects joystick port 1.
-     */
-    if ((value & 0x40) == 0)
-    {
-        uint8_t pin6 = (value & 0x01) ? 1 : 0;
-        uint8_t pin8 = (value & 0x10) ? 1 : 0;
-
-        update_arkanoid_paddle(&myPaddle, pin6, pin8);
-
-        /*
-         * Your existing dpad/analog mapping goes here.
-         *
-         * Leave this as whatever code you are currently using
-         * to produce 0..255.
-         */
-        myPaddle.current_position = myPaddle.current_position;
-
-        if (JoyState & JST_FIRE1)
-            myPaddle.button_pressed = 1;
-        else
-            myPaddle.button_pressed = 0;
-    }
-}
 
 u8 ReadJoystick(void)
 {
     u8 joy1 = 0;
-    
+
     if (myConfig.dpad == DPAD_DIAGONALS)
     {
         if (JoyState & JST_UP)    joy1 |= (0x01 | 0x08);
         if (JoyState & JST_DOWN)  joy1 |= (0x02 | 0x04);
         if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
         if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
-   
+
         if (JoyState & JST_FIRE1) joy1 |= 0x10;
         if (JoyState & JST_FIRE2) joy1 |= 0x20;
-    }
-    else if (myConfig.dpad == DPAD_ARKANOID)
-    {
-        /*
-         * joy1 is active-high here because it gets inverted below:
-         *
-         *     myAY.ayPortAIn = ~joy1;
-         *
-         * Vaus:
-         *   pin 1 = serial data
-         *   pin 2 = fire, active LOW
-         */
-   
-        /*
-         * Pin 1 / serial data
-         *
-         * Actual PSG input is active-low, so:
-         *
-         *   serial bit = 1 -> joy1 bit 0 = 0
-         *   serial bit = 0 -> joy1 bit 0 = 1
-         */
-        if (!read_paddle_pin1(&myPaddle))
-            joy1 |= 0x01;
-   
-        /*
-         * Pin 2 / fire button
-         *
-         * Actual Vaus button:
-         *   0 = pressed
-         *   1 = released
-         *
-         * Since joy1 gets inverted later:
-         *   joy1 bit 1 = 0 -> PSG bit 1 = 1
-         *   joy1 bit 1 = 1 -> PSG bit 1 = 0
-         *
-         * Therefore we want joy1 bit 1 SET when NOT pressed.
-         */
-        if ((JoyState & JST_FIRE1))
-            joy1 |= 0x02;
     }
     else // DPAD_NORMAL or SLIDE-N-GLIDE
     {
@@ -706,11 +493,11 @@ u8 ReadJoystick(void)
         if (JoyState & JST_DOWN)  joy1 |= 0x02;
         if (JoyState & JST_LEFT)  joy1 |= 0x04;
         if (JoyState & JST_RIGHT) joy1 |= 0x08;
-   
+
         if (JoyState & JST_FIRE1) joy1 |= 0x10;
         if (JoyState & JST_FIRE2) joy1 |= 0x20;
     }
-    
+
     return joy1;
 }
 
@@ -743,6 +530,86 @@ __attribute__((noinline)) void WritePort_KanjiDriver(uint8_t port, uint8_t value
     }
 }
 
+typedef struct {
+    s32 pendX, pendY;   // host motion not yet delivered to the game
+    s16 latX, latY;     // values latched for the current 4-read sequence
+    u8  phase;          // 0=X hi, 1=X lo, 2=Y hi, 3=Y lo
+    u8  strobe;         // last pin 8 level
+    u8  buttons;        // bit0 = left, bit1 = right (1 = pressed)
+    u32 lastEdge;       // scanline stamp of the last strobe edge
+} MouseState;
+
+static MouseState mouse;
+
+#define MOUSE_TIMEOUT_LINES 16   // ~1 ms at 63.5 us/line; tune if a game misses motion
+
+static inline s32 Clamp8(s32 v) { return v > 127 ? 127 : (v < -128 ? -128 : v); }
+
+void Mouse_Reset(void) { memset(&mouse, 0, sizeof(mouse)); }
+
+#define MOUSE_DPAD_SPEED  2
+#define MOUSE_PEND_MAX    (MOUSE_DPAD_SPEED * 2)   // never hold more than ~2 frames of motion
+
+static u8 needLatch;
+
+// once per frame
+__attribute__((noinline)) void Mouse_PollHost(void)
+{
+    s32 dx = 0, dy = 0;
+    if (JoyState & JST_LEFT)  dx -= MOUSE_DPAD_SPEED;
+    if (JoyState & JST_RIGHT) dx += MOUSE_DPAD_SPEED;
+    if (JoyState & JST_UP)    dy -= MOUSE_DPAD_SPEED;
+    if (JoyState & JST_DOWN)  dy += MOUSE_DPAD_SPEED;
+
+    mouse.pendX = dx ? mouse.pendX + dx : 0;
+    mouse.pendY = dy ? mouse.pendY + dy : 0;
+
+    if (mouse.pendX >  MOUSE_PEND_MAX) mouse.pendX =  MOUSE_PEND_MAX;
+    if (mouse.pendX < -MOUSE_PEND_MAX) mouse.pendX = -MOUSE_PEND_MAX;
+    if (mouse.pendY >  MOUSE_PEND_MAX) mouse.pendY =  MOUSE_PEND_MAX;
+    if (mouse.pendY < -MOUSE_PEND_MAX) mouse.pendY = -MOUSE_PEND_MAX;
+}
+
+// R#15 write: only tracks the strobe, never consumes motion
+__attribute__((noinline)) void Mouse_WritePortB(u8 r15, u32 now)
+{
+    u8 s = (r15 >> 4) & 1;          // port 1 pin 8, regardless of bit 6
+    if (s == mouse.strobe) return;  // only real edges count
+    mouse.strobe = s;
+
+    if ((now - mouse.lastEdge) > MOUSE_TIMEOUT_LINES)
+        mouse.phase = 3;            // idle: next edge becomes X high
+
+    mouse.phase = (mouse.phase + 1) & 3;
+    if (mouse.phase == 0) needLatch = 1;   // motion taken on the first read
+    mouse.lastEdge = now;
+}
+
+// R#14 read: the first read of a sequence takes the motion
+__attribute__((noinline)) u8 Mouse_Read(void)
+{
+    if (needLatch)
+    {
+        needLatch = 0;
+        mouse.latX = -mouse.pendX;   // drop the minus signs if the cursor goes backwards
+        mouse.latY = -mouse.pendY;
+        mouse.pendX = 0;
+        mouse.pendY = 0;
+    }
+
+    u8 n;
+    switch (mouse.phase)
+    {
+        case 0:  n = (mouse.latX >> 4) & 0x0F; break;
+        case 1:  n =  mouse.latX       & 0x0F; break;
+        case 2:  n = (mouse.latY >> 4) & 0x0F; break;
+        default: n =  mouse.latY       & 0x0F; break;
+    }
+    u8 b = 0x30;
+    if (JoyState & JST_FIRE1) b &= ~0x10;
+    if (JoyState & JST_FIRE2) b &= ~0x20;
+    return 0xC0 | b | n;
+}
 
 // --------------------------------------------------------------------
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
@@ -756,7 +623,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
         debug[DX++ & 0xF] = Port;
         debug[DX & 0xF] = 999999;
     }
-#endif    
+#endif
   //98h~9Bh   Access to the VDP I/O ports.
   if      (Port == 0x98) return RdData9938();               // VDP Data
   else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
@@ -768,19 +635,21 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
       // -------------------------------------------
       if (myAY.ayRegIndex == 14)
       {
-          u8 joy1 = 0x00;
-
-          // -------------------------------------------------------------
-          // Only port 1... not port 2. AY register 15 (PortB) bit 6 is
-          // set to 0 for the port 1 joystick and that's the only one
-          // this emulator will respond to...
-          // -------------------------------------------------------------
           if ((myAY.ayPortBOut & 0x40) == 0)
           {
-              joy1 = ReadJoystick();
+              if (myConfig.dpad == DPAD_MOUSE)
+              {
+                  myAY.ayPortAIn = Mouse_Read();
+              }
+              else
+              {
+                  myAY.ayPortAIn = ~ReadJoystick();
+              }
           }
-
-          myAY.ayPortAIn = ~joy1;
+          else
+          {
+              myAY.ayPortAIn = 0xFF;
+          }
       }
       else if (myAY.ayRegIndex == 15)
       {
@@ -835,7 +704,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   }
   else if (Port == 0xE9) // MIDI - not used...
   {
-      return 0x05;
+      return myConfig.MIDI;
   }
   else if (Port == 0xA4)
   {
@@ -1006,7 +875,7 @@ void msx_slot_map_turboR(unsigned char Value)
                 bRAMInPage[1] = 0;
                 if (msx_dos22)
                 {
-                    u8 *dos_rom = myConfig.fdc_driver == 1 ? TURBO_DOS23 : TURBO_DOS22;
+                    u8 *dos_rom = (myConfig.fdc_driver == 1) ? TURBO_DOS23 : TURBO_DOS22;
                     special_memory_access |= myConfig.fdc_driver == 1 ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_DOS22;
                     MemoryMap[2] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
                     MemoryMap[3] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
@@ -1123,7 +992,7 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     else if (Port == 0x9A) {write_port_palette(Value);}         // VDP Palette
     else if (Port == 0x9B) {IndirectRegWrite9938(Value);}       // Indirect Register Area
     else if (Port == 0xA0) {ay38910IndexW(Value&0xF, &myAY);}   // PSG Area
-    else if (Port == 0xA1) {ay38910DataW(Value, &myAY);}        // PSG Area
+    else if (Port == 0xA1) {ay38910DataW(Value, &myAY); if (myAY.ayRegIndex == 15) Mouse_WritePortB(myAY.ayPortBOut, CurLine);}        // PSG Area
     else if (Port == 0xB4) {write_port_RTC_index(Value);}       // RTC Area (index register)
     else if (Port == 0xB5) {write_port_RTC_data(Value);}        // RTC Area (data register)
     else if (Port == 0xF4) {last_f4 = Value;}
@@ -1602,24 +1471,24 @@ void MSX_InitialMemoryLayout(void)
 
     if (myConfig.fdc_driver) msx_dos22 = 1;
     else msx_dos22 = CheckForDos22();
-    
-    if (1==1)
-    {
-        MyMedia[MEDIA_CART2].mapperMask = 0x01;
-        MyMedia[MEDIA_CART2].blockSize = 0x2000;
-        MyMedia[MEDIA_CART2].mapperType = FMPAC_SRAM;
 
-        MSXCartPtr[MEDIA_CART2][0] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        MSXCartPtr[MEDIA_CART2][1] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        MSXCartPtr[MEDIA_CART2][2] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        MSXCartPtr[MEDIA_CART2][3] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        MSXCartPtr[MEDIA_CART2][4] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        MSXCartPtr[MEDIA_CART2][5] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        MSXCartPtr[MEDIA_CART2][6] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        MSXCartPtr[MEDIA_CART2][7] = (u8*)Unmapped_Memory;           // Segment Unmapped
-        
-        msxLoadSRAM();  // FM-PAC with MSX-MUSIC also has 8K of SRAM
-    }
+    // ---------------------------------------------------------------------------------------
+    // CART2 has the PAC_SRAM with 8K of SRAM available... not really a cart but close enough.
+    // ---------------------------------------------------------------------------------------
+    MyMedia[MEDIA_CART2].mapperMask = 0x01;
+    MyMedia[MEDIA_CART2].blockSize = 0x2000;
+    MyMedia[MEDIA_CART2].mapperType = PAC_SRAM;
+
+    MSXCartPtr[MEDIA_CART2][0] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][1] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][2] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][3] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][4] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][5] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][6] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][7] = (u8*)Unmapped_Memory;           // Segment Unmapped
+
+    msxLoadSRAM();  // FM-PAC with MSX-MUSIC also has 8K of SRAM
 
     if (MyMedia[MEDIA_CART1].filecrc) // For ROMs we need a mapper type... User might have pre-selected one or we need to guess.
     {
@@ -1630,11 +1499,11 @@ void MSX_InitialMemoryLayout(void)
             {
                 MyMedia[MEDIA_CART1].mapperType = MSX_GuessROMType(MyMedia[MEDIA_CART1].filesize); // We only bother if the game is 64K or larger
             }
-            
-            // Still no idea... we just call it MIRRORED and push on
+
+            // Still no idea... we just call it ASC8 and push on
             if (MyMedia[MEDIA_CART1].mapperType == 0xFF)
             {
-                MyMedia[MEDIA_CART1].mapperType = MIRRORED;
+                MyMedia[MEDIA_CART1].mapperType = ASC8;
             }
         }
         else // User has selected a specific mapper... who are we to argue?!
@@ -1645,38 +1514,14 @@ void MSX_InitialMemoryLayout(void)
         MSX_CartSetup(MEDIA_CART1);
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // If we are dealing with one of the rare SRAM games, read the SRAM file from the SD card back into memory.
-    // We only allow this for CART1 - we will ignore any SRAM-based CART that is in slot 2...
-    // ---------------------------------------------------------------------------------------------------------
-    if ((MyMedia[MEDIA_CART1].mapperType == ASC8SRAM2) || (MyMedia[MEDIA_CART1].mapperType == ASC8SRAM8) || (MyMedia[MEDIA_CART1].mapperType == ASC16SRAM2) ||
-        (MyMedia[MEDIA_CART1].mapperType == ASC16SRAM8) || (MyMedia[MEDIA_CART1].mapperType == GAME_MASTER2) || (MyMedia[MEDIA_CART1].mapperType == KOEISRAM32))
-    {
-        msxLoadSRAM();
-    }
-    
     // ------------------------------------------------------------------------------------------------------------
     // If we are dealing with one of the rare FLASH writable games, read the modified flash blocks back into ROM.
     // ------------------------------------------------------------------------------------------------------------
-    if ((MyMedia[MEDIA_CART1].mapperType == ASC16X) || (MyMedia[MEDIA_CART1].mapperType == MANBOW2) || (MyMedia[MEDIA_CART1].mapperType == HAMARAJANIGHT) ||
-        (MyMedia[MEDIA_CART1].mapperType == RBSC_FLASH))
+    if (MyMedia[MEDIA_CART1].mapperType == ASC16X)
     {
         MsxRestoreFlash();
-    }    
+    }
 }
-
-// ---------------------------------------------------------------------------
-// Classic Konami SCC register layout (relative to 9800h) puts the register
-// block at 0x80 and shares one 32-byte waveform between Ch3 and Ch4 (the
-// SCC+ driver instead treats 0x80-0x9F as Ch4's own independent wave RAM
-// and moved the register block to 0xA0) - so classic-mode writes need to be
-// relocated before reaching SCCWrite, and Ch3 wave writes need to be mirrored
-// into Ch4's wave RAM to reproduce the real shared-waveform behavior.
-// ---------------------------------------------------------------------------
-void SCC_LegacyWrite(u8 value, u16 address)
-{
-}
-
 
 // ---------------------------------------------------------------
 // Restore the MSX BIOS into the memory buffer and point to it...
@@ -1684,7 +1529,7 @@ void SCC_LegacyWrite(u8 value, u16 address)
 void msx_restore_bios(void)
 {
     memcpy(BIOS_Memory, TURBO_BIOS, 0x8000);
-    
+
     // Slot 0 - BIOS is mapped in to start...
     MemoryMap[0] = TURBO_BIOS + 0x0000 - 0x0000;
     MemoryMap[1] = TURBO_BIOS + 0x2000 - 0x2000;
@@ -1710,8 +1555,15 @@ void msx_reset(void)
     s1990_is_r800 = 0;
     pcm_counter = 0;
     memset(KanjiAdr, 0x00, sizeof(KanjiAdr));
-
+    
+    mirror_ram_bank[0] = 3;
+    mirror_ram_bank[1] = 2;
+    mirror_ram_bank[2] = 1;
+    mirror_ram_bank[3] = 0;
+    
     MSX_InitialMemoryLayout();
+    
+    Mouse_Reset();
 
     // -------------------------------------------------
     // If a disk was part of the setup, load it now...
@@ -1722,17 +1574,6 @@ void msx_reset(void)
         fdc_init(2, (MyMedia[MEDIA_DISK].filesize/1024 == 360) ? 1:2, 80, 9, 512, 1, DISK_Memory, DISK_Memory1);
         fdc_reset(true);
     }
-
-    // Setup the PortB write - Arkanoid paddles need this...
-    myAY.ayPortBOutFptr = ayPortBOutHandler;
-    myPaddle.current_position = 130;
-}
-
-int GetSizeSRAM(void)
-{
-         if (MyMedia[MEDIA_CART1].mapperType == KOEISRAM32) return 0x8000;   // KOEI makes use of large 32K SRAM areas
-    else if (MyMedia[MEDIA_CART1].mapperType == GAME_MASTER2) return 0x4000; // Really 8K but due to mapping we need to save 16K
-    else return 0x2000; // This covers 2K to 8K which is very typical...
 }
 
 // -------------------------------------------------------------------
@@ -1760,8 +1601,7 @@ void msxSaveSRAM(void)
     FILE *handle = fopen(szName, "wb+");
     if (handle != NULL)
     {
-        // SRAM is up to 32K in size...
-        fwrite(SRAM_Memory, GetSizeSRAM(), 1, handle);
+        fwrite(SRAM_Memory, sizeof(SRAM_Memory), 1, handle);
         fclose(handle);
     }
 }
@@ -1784,9 +1624,9 @@ void msxLoadSRAM(void)
     szName[len-0] = 0;
 
     // Check if the file exists... if so read it...
-    if (ReadFileCarefully(szName, SRAM_Memory, 0x8000, 0, NULL) == 0)   // SRAM can be anywhere from 2K to 32K
+    if (ReadFileCarefully(szName, SRAM_Memory, sizeof(SRAM_Memory), 0, NULL) == 0)   // SRAM can be anywhere from 2K to 32K
     {
-        memset(SRAM_Memory, 0xFF, 0x8000); // Not found, so init the SRAM area
+        memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory)); // Not found, so init the SRAM area
     }
 }
 

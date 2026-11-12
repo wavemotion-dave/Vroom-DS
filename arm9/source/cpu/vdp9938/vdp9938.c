@@ -37,9 +37,7 @@ u8 msx_irq_pending          __attribute__((section(".dtcm"))) = 0;   // Bitmask,
 u8 palette_latch            __attribute__((section(".dtcm"))) = 0;
 u16 screenPanX              __attribute__((section(".dtcm"))) = 0;   // Horizontal pan in output pixels: 0, 2, 4, ... 256
 u8 overscan_trick           __attribute__((section(".dtcm"))) = 0;   // Will be set to 1 if game tries to bypass the VSYNC
-u8 vdp_type                 __attribute__((section(".dtcm"))) = VDP_9958;
 
-extern u8 turbo_r_boost;
 u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
                             {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
                             {1,1,0,0,1,1,0,0,   1,1,0,0,1,1,0,0},  // Light: 50% (we draw two consecutive and skip two consecutive)
@@ -859,7 +857,7 @@ static inline u8 Screen8SpriteByte(const u8 *base, int offset)
     return VDP_Memory[VDP9938Screen8Address(address)];
 }
 
-u8 DoesScreen8LineHaveSprites(uint8_t Y)
+ITCM_CODE u8 DoesScreen8LineHaveSprites(uint8_t Y)
 {
     static const uint8_t SprHeights[4] = { 8,16,16,32 };
     uint8_t IH,OH;
@@ -2630,8 +2628,7 @@ static inline __attribute__((always_inline)) u32 LdrRot(const u8 *p)
     return v;
 }
 
-__attribute__((noinline))
-static void RefreshLine8_HScrollFast(u8 *P, u32 sourceAddress)
+ITCM_CODE static void RefreshLine8_HScrollFast(u8 *P, u32 sourceAddress)
 {
     // 2-pixel quantised: hs is always even, so even/odd banks keep their natural order
     u32 hs = (((VDP[26] & 0x3F) << 3) - (VDP[27] & 7)) & 0xFE;
@@ -2669,7 +2666,7 @@ static void RefreshLine8_HScrollFast(u8 *P, u32 sourceAddress)
 
 
 // Renders the scrolled/masked background for one line into P (256 bytes, word aligned)
-void RefreshLine8_HScroll(u8 uY, u8 *P, u32 sourceAddress)
+ITCM_CODE void RefreshLine8_HScroll(u8 uY, u8 *P, u32 sourceAddress)
 {
     if (!(VDP[25] & 0x09))                    // SP2=0 and YJK off: fused fast path
     {
@@ -3314,7 +3311,7 @@ ITCM_CODE byte RdCtrl9938(void)
   {
       VDPStatus[1] &= 0xFE;  // Clear the LINE interrupt.
       SetVDPIRQ(VDP_IRQ_LINE, 0);
-      data |= vdp_type;
+      data |= VDP_9958;
   }
   else if (VDP[15] == 2) // Status register 2
   {
@@ -3504,17 +3501,14 @@ void Reset9938(void)
     memset(OccBuf,      0x00, sizeof(OccBuf));       // Reset the sprite occurrence buffer
     CurrentEpochSaved = 0;                           // Will be immediately incremented to 1 and so not match our cleared OccBuf[]
 
-    // Set VDP type based on DS machine - we can't handle the faster
-    vdp_type = VDP_9958;    // MSX Turbo-R uses V9958
-
-    VDP[0] = 0x00;                      // Graphic mode enabled
-    VDP[1] = 0x10;                      // 128K VRAM, IRQ enable, high-res mode
-    VDP[2] = 0xFF;                      // Name table for text modes
-    VDP[3] = 0xFF;                      // Color table
-    VDP[4] = 0xFF;                      // Pattern generator
-    VDP[5] = 0xFF;                      // Sprite attribute table
-    VDP[6] = 0x00;                      // Sprite generator table
-    VDP[7] = 0x00;                      // FG/BG colors
+    VDP[0] = 0x00;                          // Graphic mode enabled
+    VDP[1] = 0x10;                          // 128K VRAM, IRQ enable, high-res mode
+    VDP[2] = 0xFF;                          // Name table for text modes
+    VDP[3] = 0xFF;                          // Color table
+    VDP[4] = 0xFF;                          // Pattern generator
+    VDP[5] = 0xFF;                          // Sprite attribute table
+    VDP[6] = 0x00;                          // Sprite generator table
+    VDP[7] = 0x00;                          // FG/BG colors
 
     VDPCtrlLatch=0;                         // Control Latch zero
     VDPDlatch = 0;                          // Data Latch zero

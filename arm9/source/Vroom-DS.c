@@ -59,9 +59,7 @@ u8 slide_dampen         __attribute__((section(".dtcm"))) = 0;
 u8 skip_render          __attribute__((section(".dtcm"))) = 0;
 u8 zoom_screen          __attribute__((section(".dtcm"))) = 0;
 u8 bClickRemoveNeeded   __attribute__((section(".dtcm"))) = 1;
-
-u32 turbo_r_boost_counter = 0;
-u8 turbo_r_boost = 0;
+u8 turbo_r_boost        __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
 // The MSX systems have ROM, RAM, BIOS, Music Carts or SRAM. So we create generic buffers
@@ -386,7 +384,6 @@ void sound_chip_reset()
 
     bClickRemoveNeeded = 150; // When we re-enable... smooth it to avoid pops/clicks
 
-    msx_scc_capable_game = 0;   // Until proven otherwise
     msx_music_capable_game = 0; // Until proven otherwise
 
     // -----------------------------------------------------------
@@ -444,8 +441,7 @@ void ResetMSX(void)
 
     keyMapType = 0; // If we go back into options
     
-    turbo_r_boost = 0;
-    turbo_r_boost_counter = 0;
+    turbo_r_boost = 0;  // Normal Z80 speed to start...
 
     // -----------------------------------------------------------
     // Timer 1 is used to time frame-to-frame of actual emulation
@@ -1132,7 +1128,6 @@ u8 handle_debugger_overlay(u16 iTx, u16 iTy)
     return MENU_CHOICE_NONE;
 }
 
-
 // ----------------------------------------------------------------------------
 // Slide-n-Glide D-pad keeps moving in the last known direction for a few more
 // frames to help make those hairpin turns up and off ladders much easier...
@@ -1526,18 +1521,7 @@ void VroomDSRunEmu(void)
             }
             else if (nds_key & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B | KEY_START | KEY_SELECT | KEY_R | KEY_L | KEY_X | KEY_Y))
             {
-                if (myConfig.dpad == DPAD_ARKANOID) // This is a paddle controller and we nudge the position with left/right
-                {
-                    if (nds_key & KEY_LEFT)
-                    {
-                        update_arkanoid_paddle_position(0, (nds_key & KEY_B) ? 10 : 5);
-                    }
-                    if (nds_key & KEY_RIGHT)
-                    {
-                        update_arkanoid_paddle_position(1, (nds_key & KEY_B) ? 10 : 5);
-                    }
-                }
-                else if (myConfig.dpad == DPAD_SLIDE_N_GLIDE) // CHUCKIE-EGG Style... hold left/right or up/down for a few frames
+                if (myConfig.dpad == DPAD_SLIDE_N_GLIDE) // CHUCKIE-EGG Style... hold left/right or up/down for a few frames
                 {
                     if (nds_key & KEY_UP)
                     {
@@ -1583,6 +1567,10 @@ void VroomDSRunEmu(void)
                         slide_n_glide_key_right--;
                         nds_key |= KEY_RIGHT;
                     }
+                }
+                else if (myConfig.dpad == DPAD_MOUSE)
+                {
+                    Mouse_PollHost();
                 }
 
                 // --------------------------------------------------------------------------------------------------
@@ -2211,8 +2199,9 @@ int main(int argc, char **argv)
             fseek(fp, 0x048000, SEEK_SET);
             fread(TURBO_OPENING, 1, 0x4000, fp);
             
-            // And patch the logo
+            // And patch the logo timing
             TURBO_OPENING[0x3A20] = 0x3E;
+            TURBO_OPENING[0x3A21] = 0x20;
             TURBO_OPENING[0x3A22] = 0x3D;
             TURBO_OPENING[0x3A23] = 0xF0;
             TURBO_OPENING[0x3A24] = 0xFD;

@@ -44,7 +44,7 @@ typedef struct
     u32 name_hash; // Repurpose the lower bit for love vs like
 } Favorites_t;
 
-#define MAX_FAVS 1024
+#define MAX_FAVS 256
 
 Favorites_t myFavs[MAX_FAVS]; // Total of 4K of space with 32 bit hash
 
@@ -457,6 +457,14 @@ int msxFilescmp(const void *c1, const void *c2)
     return strcasecmp(p1->szName, p2->szName);
 }
 
+long long get_file_size(const char *filename) {
+    struct stat st;
+    if (stat(filename, &st) == 0) {
+        return (long long)st.st_size;
+    }
+    return -1; // Error (e.g., file not found)
+}
+
 /*********************************************************************************
  * Find files (COL / ROM) available - sort them for display.
  ********************************************************************************/
@@ -492,26 +500,29 @@ void VroomDSFindFiles(u8 media_id)
         {
             if ((strlen(szFile) > 4) && (strlen(szFile) < (MAX_FILE_NAME_LEN - 4)) && (szFile[0] != '.') && (szFile[0] != '_')) // For MAC don't allow underscore files
             {
-                if ((strcasecmp(strrchr(szFile, '.'), ".rom") == 0) && (media_id != MEDIA_DISK))
+                if (get_file_size(szFile) >= 64)
                 {
-                    strcpy(gpFic[uNbFile].szName, szFile);
-                    gpFic[uNbFile].uType = MSXROM;
-                    uNbFile++;
-                    countMSX++;
-                }
-                if ((strcasecmp(strrchr(szFile, '.'), ".bin") == 0) && (media_id != MEDIA_DISK))
-                {
-                    strcpy(gpFic[uNbFile].szName, szFile);
-                    gpFic[uNbFile].uType = MSXROM;
-                    uNbFile++;
-                    countMSX++;
-                }
-                if ((strcasecmp(strrchr(szFile, '.'), ".dsk") == 0) && (media_id == MEDIA_DISK))
-                {
-                    strcpy(gpFic[uNbFile].szName, szFile);
-                    gpFic[uNbFile].uType = MSXROM;
-                    uNbFile++;
-                    countMSX++;
+                    if ((strcasecmp(strrchr(szFile, '.'), ".rom") == 0) && (media_id != MEDIA_DISK))
+                    {
+                        strcpy(gpFic[uNbFile].szName, szFile);
+                        gpFic[uNbFile].uType = MSXROM;
+                        uNbFile++;
+                        countMSX++;
+                    }
+                    if ((strcasecmp(strrchr(szFile, '.'), ".bin") == 0) && (media_id != MEDIA_DISK))
+                    {
+                        strcpy(gpFic[uNbFile].szName, szFile);
+                        gpFic[uNbFile].uType = MSXROM;
+                        uNbFile++;
+                        countMSX++;
+                    }
+                    if ((strcasecmp(strrchr(szFile, '.'), ".dsk") == 0) && (media_id == MEDIA_DISK))
+                    {
+                        strcpy(gpFic[uNbFile].szName, szFile);
+                        gpFic[uNbFile].uType = MSXROM;
+                        uNbFile++;
+                        countMSX++;
+                    }
                 }
             }
         }
@@ -535,7 +546,7 @@ u8 VroomDSChooseFile(u8 media_id, u8 allow_dir_change)
     u8 bDone = false;
     u16 ucHaut = 0x00, ucBas = 0x00, ucSHaut = 0x00, ucSBas = 0x00, romSelected = 0, firstRomDisplay = 0, nbRomPerPage, uNbRSPage;
     s16 uLenFic = 0, ucFlip = 0, ucFlop = 0;
-   
+
     // Show the menu...
     while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B)) != 0)
         ;
@@ -570,7 +581,7 @@ u8 VroomDSChooseFile(u8 media_id, u8 allow_dir_change)
         romSelected = 0;
     }
     dsDisplayFiles(firstRomDisplay, romSelected);
-    
+
     // -----------------------------------------------------
     // Until the user selects a file or exits the menu...
     // -----------------------------------------------------
@@ -815,14 +826,9 @@ u8 VroomDSChooseFile(u8 media_id, u8 allow_dir_change)
                 else
                 {
                     DSPrint(5, 22, 0, "NO DIR CHANGE FOR SWAP");
-                    WAITVBL;
-                    WAITVBL;
-                    WAITVBL;
-                    WAITVBL;
-                    WAITVBL;
-                    WAITVBL;
-                    WAITVBL;
-                    WAITVBL;
+                    WAITVBL; WAITVBL; WAITVBL;
+                    WAITVBL; WAITVBL; WAITVBL;
+                    WAITVBL; WAITVBL;
                     DSPrint(5, 22, 0, "                      ");
                 }
                 while (keysCurrent() & KEY_A)
@@ -959,40 +965,6 @@ void SaveConfig(bool bShow)
     }
 }
 
-// -------------------------------------------------------------------------
-// Here we look for the known Turbo-R games and apply the "best" settings...
-// -------------------------------------------------------------------------
-void ApplyDatabaseTweaks(void)
-{
-    const char *filename = GetMasterFilename();
-
-    zone_terra_hack = 0;
-    
-    if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
-    {
-        zone_terra_hack         = 300; // Roughly 5 seconds of holding the A button to bypass intro...
-        myConfig.yOffset        = 9;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_HEAVY;
-    }
-    
-    if (strstr(filename, "DARAIAYU"))
-    {
-        myConfig.cpuBoost       = CPU_BOOST_MAX;
-        myConfig.frameSkip      = FS_HEAVY;
-        myConfig.fdc_driver     = FDC_TOSH;
-    }
-
-    if (strstr(filename, "ILLUSION") && strstr(filename, "CITY"))
-    {
-        zone_terra_hack         = 300; // Roughly 5 seconds of holding the A button to bypass intro...
-        myConfig.scaleScreen    = 1;
-        myConfig.yOffset        = 2;
-        myConfig.cpuBoost       = CPU_BOOST_SLOW;
-        myConfig.frameSkip      = FS_LIGHT;
-    }
-}
-
 void MapPlayer1(void)
 {
     myConfig.keymap[0] = 0;   // NDS D-Pad mapped to MSX Joystick UP
@@ -1041,6 +1013,180 @@ void MapCursors(void)
     myConfig.keymap[10] = 53; // NDS Select mapped to RETURN
 }
 
+// -------------------------------------------------------------------------
+// Here we look for the known Turbo-R games and apply the "best" settings...
+// -------------------------------------------------------------------------
+void ApplyDatabaseTweaks(void)
+{
+    const char *filename = GetMasterFilename();
+
+    zone_terra_hack = 0;
+
+    // ROM Games
+    if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
+    {
+        zone_terra_hack         = 300; // Roughly 5 seconds of holding the A button to bypass intro...
+        myConfig.yOffset        = 9;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.fdc_driver     = FDC_WD;
+    }
+
+    if (strstr(filename, "DARAIAYU"))
+    {
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "ILLUSION") && strstr(filename, "CITY"))
+    {
+        myConfig.scaleScreen    = 1;
+        myConfig.yOffset        = 2;
+        myConfig.cpuBoost       = CPU_BOOST_SLOW;
+        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "KARATE") && strstr(filename, "CHAMP"))
+    {
+        myConfig.yOffset        = 17;
+        myConfig.cpuBoost       = CPU_BOOST_MED;
+        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "KITTEN") && strstr(filename, "RETURN"))
+    {
+        myConfig.yOffset        = 20;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "NEON") && strstr(filename, "REVENANT"))
+    {
+        myConfig.frameSkip      = FS_LIGHT;
+    }
+
+    if (strstr(filename, "SUPER") && strstr(filename, "WONDER"))
+    {
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "NEON") && strstr(filename, "REVENANT"))
+    {
+        myConfig.yOffset        = 18;
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+    
+    if (strstr(filename, "XENON") && strstr(filename, "MEGABLAST"))
+    {
+        myConfig.msxMapper      = SCC8;
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "YOOMP"))
+    {
+        myConfig.msxMapper      = ASC16;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+    
+    if (strstr(filename, "ZERO") && strstr(filename, "NOHO"))
+    {
+        myConfig.yOffset        = 15;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "TREX") && strstr(filename, "TURBO"))
+    {
+        myConfig.yOffset        = 9;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    // Floppy Games
+    if (strstr(filename, "2021") && strstr(filename, "SNOOKY"))
+    {
+        myConfig.yOffset        = 13;
+        myConfig.fdc_driver     = FDC_WD;
+    }
+
+    if (strstr(filename, "DESTINY") && strstr(filename, "2"))
+    {
+        myConfig.yOffset        = 7;
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+    }
+
+    if (strstr(filename, "ANGRY") && strstr(filename, "BOT"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        MapCursors();
+    }
+
+    if (strstr(filename, "APPETITE") && strstr(filename, "COMPLETE"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        MapCursors();
+    }
+
+    if (strstr(filename, "BOSTON") && strstr(filename, "CLUB"))
+    {
+        myConfig.yOffset        = 20;
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.dpad           = DPAD_MOUSE;
+    }
+
+    if (strstr(filename, "CLOPPY"))
+    {
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+    }
+
+    if (strstr(filename, "DENSITY") && strstr(filename, "WISH"))
+    {
+        myConfig.yOffset        = 7;
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        MapCursors();
+    }
+    
+    if (strstr(filename, "DEWOMAN"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.MIDI           = 0xFF;
+    }
+    
+    //zzz
+
+    if (strstr(filename, "GUN") && strstr(filename, "SHOT"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.dpad           = DPAD_MOUSE;
+    }
+
+}
+
+
 void SetDefaultGlobalConfig(void)
 {
     // A few global defaults...
@@ -1067,12 +1213,11 @@ void SetDefaultGameConfig(void)
     myConfig.frameSkip = 1;                     // Light frameskip by default... some games will need heavy
     myConfig.ymScale = YM_BAL_MED;              // Normal YM is scaled mid-level
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
-    myConfig.reserved2 = 0;
+    myConfig.MIDI = 0x05;
     myConfig.reserved3 = 0;
     myConfig.reserved4 = 0;
     myConfig.reserved5 = 0;
     myConfig.reserved6 = 0;
-    myConfig.reserved7 = 0xA5; // So it's easy to spot on an "upgrade" and we can re-default it
 
     ApplyDatabaseTweaks(); // Some games need tweaks to default settings... do this now
 }
@@ -1158,14 +1303,15 @@ const struct options_t Option_Table[1][20] =
 {
     // Page 1 - Game Options
     {
-        {"MSX MAPPER",      {"GUESS", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K"},                                                                              &myConfig.msxMapper,         4},
+        {"MSX MAPPER",      {"GUESS", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "ASCII 16X", "NEO8", "NEO16"},                                                &myConfig.msxMapper,         7},
         {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "MAX"},                                                                                                          &myConfig.cpuBoost,          4},
         {"FRAMESKIP",       {"NONE", "LIGHT", "HEAVY"},                                                                                                                 &myConfig.frameSkip,         3},
+        {"DPAD",            {"NORMAL", "DIAGONALS", "MOUSE", "SLIDE-N-GLIDE"},                                                                                          &myConfig.dpad,              4},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
         {"FDC DRIVER",      {"WD2973", "TC8566AF"},                                                                                                                     &myConfig.fdc_driver,        2},
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
-        {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},                             
+        {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},
         {"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
         {"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},
@@ -1519,7 +1665,7 @@ void VroomDSChangeKeymap(void)
 void DisplayFileNames(void)
 {
     const u8 y_map[3] = {0,2,1};
-    
+
     for (int id = 0; id < (MEDIA_DISK + 1); id++)
     {
         // ------------------------------------------------------------------------------
@@ -1634,7 +1780,7 @@ u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset, u32
 
         // TODO add a trap for infinite loop - exit with error.
     } while (crc1 != crc2); // If the file couldn't be read, file_size will be 0 and the CRCs will both be 0xFFFFFFFF
-    
+
     // -----------------------------------------------------------------------
     // If we are a .DSK file, we need to use the filename itself as the CRC32
     // or else disks that get re-written will end up with a different CRC32.
@@ -1696,7 +1842,7 @@ void VroomDSMainMenu(void)
 
     // Upper Screen Background
     UpperScreenMainMenu();
-    
+
     // Lower Screen Background
     BottomScreenMainMenu();
 
@@ -1836,7 +1982,7 @@ void VroomDSMainMenu(void)
 
         swiWaitForVBlank();
     }
-    
+
     bMainMenuActive = 0;
 }
 
