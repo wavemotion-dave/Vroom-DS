@@ -97,17 +97,22 @@ struct __attribute__((__packed__)) Config_t
 
 #define FS_NONE                     0       // No Frame Skip
 #define FS_LIGHT                    1       // Light Frame Skip
-#define FS_AGGRESSIVE               2       // Aggressive Frame Skip
-#define FS_HEAVY  FS_AGGRESSIVE
+#define FS_HEAVY                    2       // Heavy Frame Skip
+
+#define CPU_BOOST_SLOW              0       // A bit slower than normal
+#define CPU_BOOST_MED               1       // Roughly normal
+#define CPU_BOOST_FAST              2       // A bit faster than normal
+#define CPU_BOOST_MAX               3       // She can't take much more, Capt'n!
+
+#define FDC_WD                      0       // Older WD2793 driver
+#define FDC_TOSH                    1       // MSX Turbo-R Toshiba Driver
 
 #define YM_BAL_LOW                  0       // Low YM volume mix
 #define YM_BAL_MED                  1       // Medium YM volume mix
 #define YM_BAL_HIGH                 2       // High YM volume mix
 #define YM_BAL_MAX                  3       // Max (normal) YM volume mix
 
-#define VDP_9938                    0
-#define VDP_9958                    4
-
+#define VDP_9958                    4       // Must be returned from V9938 status reads...
 
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
@@ -131,6 +136,7 @@ extern s8 temp_offset;
 extern u8 render_blended;
 extern u8 msx_dos22;
 extern u32 dos22_bank;
+extern u16 zone_terra_hack;
 
 extern FI_MSX gpFic[MAX_FILES];
 extern int ucGameAct;

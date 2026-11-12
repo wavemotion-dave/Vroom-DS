@@ -3407,7 +3407,7 @@ ITCM_CODE void Loop9938(void)
           int first_visible_line = VDP9938_START_LINE;
           if ((VDP[9] & 0x80)) first_visible_line += myConfig.yOffset+temp_offset;
 
-          if ((CurLine >= first_visible_line) &&  (CurLine < (first_visible_line+192)))
+          if ((CurLine >= first_visible_line) &&  (CurLine < (first_visible_line+(myConfig.scaleScreen ? 212:192))))
           {
               RefreshLine(CurLine - VDP9938_START_LINE);
           }

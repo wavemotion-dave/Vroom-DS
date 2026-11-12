@@ -1283,6 +1283,14 @@ void VroomDSRunEmu(void)
             {
                 zoom_screen = 0;
             }
+            
+            // ------------------------------------------------------------------------------------------------------------
+            // With a compressed screen, we use the A/B buffers to blur the display so compressed text is a bit cleaner...
+            // ------------------------------------------------------------------------------------------------------------
+            if (myConfig.scaleScreen)
+            {
+                render_blended = 1;
+            }            
 
             // ---------------------------------------------------------------------------------
             // Hold the key press for a brief instant... some machines take longer than others
@@ -1824,6 +1832,15 @@ void VroomDSRunEmu(void)
             // Accumulate all bits above into the Joystick State var...
             // ---------------------------------------------------------
             JoyState = JoyStickMap;
+            
+            // ---------------------------------------------------------------------------------------------------
+            // Zone Terra requires a direct press to get into gameplay before the title screen (freeze otherwise).
+            // ---------------------------------------------------------------------------------------------------
+            if (zone_terra_hack)
+            {
+                zone_terra_hack--;
+                JoyState |= JST_FIRE1;
+            }
 
             // --------------------------------------------------
             // Handle Auto-Fire if enabled in configuration...
@@ -2074,7 +2091,7 @@ ITCM_CODE void irqVBlank(void)
         // ---------------------------------------------------------------------
         // Are we in 192 scanline mode? If so, we don't need ANY screen panning.
         // ---------------------------------------------------------------------
-        if (!(VDP[9] & 0x80) && !myConfig.overscan) // High bit set if we are in 212 mode (we ignore this if overscan enabled)
+        if (!(VDP[9] & 0x80)) // High bit set if we are in 212 mode (we ignore this if overscan enabled)
         {
             cyBG = 0;   // No shift
             shifty = 0; // No shift
@@ -2093,7 +2110,7 @@ ITCM_CODE void irqVBlank(void)
             // --------------------------------------------------------------------
             if (myConfig.scaleScreen)
             {
-                ydyBG = (((myConfig.overscan ? 224 : 212) / 192) << 8) | ((myConfig.overscan ? 224 : 212) % 192);
+                ydyBG = ((212 / 192) << 8) | (212 % 192);
                 if (myConfig.yOffset + temp_offset == 0)
                 {
                     cyBG = (1 << 8);

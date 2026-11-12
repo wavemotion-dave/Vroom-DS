@@ -28,7 +28,7 @@
 int countMSX = 0;
 int ucGameAct = 0;
 int ucGameChoice = -1;
-u8 zone_terra_hack = 0;
+u16 zone_terra_hack = 0;
 
 FI_MSX gpFic[MAX_FILES];
 char szName[256];
@@ -970,7 +970,26 @@ void ApplyDatabaseTweaks(void)
     
     if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
     {
-        zone_terra_hack = 1;
+        zone_terra_hack         = 300; // Roughly 5 seconds of holding the A button to bypass intro...
+        myConfig.yOffset        = 9;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+    }
+    
+    if (strstr(filename, "DARAIAYU"))
+    {
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+
+    if (strstr(filename, "ILLUSION") && strstr(filename, "CITY"))
+    {
+        zone_terra_hack         = 300; // Roughly 5 seconds of holding the A button to bypass intro...
+        myConfig.scaleScreen    = 1;
+        myConfig.yOffset        = 2;
+        myConfig.cpuBoost       = CPU_BOOST_SLOW;
+        myConfig.frameSkip      = FS_LIGHT;
     }
 }
 
@@ -1139,12 +1158,14 @@ const struct options_t Option_Table[1][20] =
 {
     // Page 1 - Game Options
     {
-        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST"},                                                                                                                 &myConfig.cpuBoost,          3},
+        {"MSX MAPPER",      {"GUESS", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K"},                                                                              &myConfig.msxMapper,         4},
+        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "MAX"},                                                                                                          &myConfig.cpuBoost,          4},
         {"FRAMESKIP",       {"NONE", "LIGHT", "HEAVY"},                                                                                                                 &myConfig.frameSkip,         3},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
         {"FDC DRIVER",      {"WD2973", "TC8566AF"},                                                                                                                     &myConfig.fdc_driver,        2},
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
+        {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},                             
         {"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
         {"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},
