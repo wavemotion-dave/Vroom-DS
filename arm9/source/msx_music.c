@@ -28,7 +28,6 @@
 //@ Tunables.
 //@----------------------------------------------------------------------------
 #define YM_SAMPLE_RATE 18600            // confirmed value, matches the AY driver's rate
-#define PCM_SCANLINE_RATE (VDP9938_FRAMES * VDP9938_LINES)
 #define YM_MASTER_CLOCK 3579545         // MSX standard clock, same as SCC's
 #define YM_SIN_SHIFT 24                 // phase>>24 -> 8-bit (256 entry) table index
 #define YM_GAIN_RAMP_STEP 16            // Gain ramp toward full level on key-on.
@@ -855,29 +854,27 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 // Melodic FM is rendered at half the output rate; rhythm and filtering
 // remain at the full output rate.
 // -------------------------------------------------------------------------
-static __attribute__((noinline)) s32 PCM_MixSample(void)
+static __attribute__((noinline)) s32 PCM_MixSample(u16 *read, u16 count)
 {
-    pcm_sample_phase += PCM_SCANLINE_RATE;
-    if (pcm_sample_phase >= YM_SAMPLE_RATE)
+    if (*read < count)
     {
-        pcm_sample_phase -= YM_SAMPLE_RATE;
-
-        u16 read = pcm_sample_read;
-        if (read != pcm_sample_write)
-        {
-            pcm_sample_current =
-                pcm_samples[read & (PCM_SAMPLE_BUFFER_SIZE - 1)];
-            pcm_sample_read = read + 1;
-        }
+        pcm_sample_current = pcm_samples[(*read)++];
     }
 
-    return ((s32)pcm_sample_current - 128) * 128;
+    s32 target = ((s32)pcm_sample_current - 128) * 128;
+    s32 difference = target - pcm_sample_filtered;
+    if (difference > 2048) difference = 2048;
+    else if (difference < -2048) difference = -2048;
+    pcm_sample_filtered += difference;
+    return pcm_sample_filtered;
 }
 
 ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 {
     int i;
     int pcmEnabled = myConfig.pcm;
+    u16 pcmCount = pcmEnabled ? pcm_sample_write : 0;
+    u16 pcmRead = 0;
     int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
     int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
 
@@ -1101,7 +1098,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 
         if (pcmEnabled)
         {
-            sample += PCM_MixSample();
+            sample += PCM_MixSample(&pcmRead, pcmCount);
         }
 
         /* Mix one synthesized sample into the existing output buffer. */
@@ -1112,6 +1109,11 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
         else if (mixed < -32768) mixed = -32768;
 
         dest[i] = (s16)mixed;
+    }
+
+    if (pcmEnabled)
+    {
+        pcm_sample_write = 0;
     }
 }
 

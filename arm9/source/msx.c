@@ -52,10 +52,9 @@ u8 pcm_counter = 0;
 u8 pcm_last_a4 = 0;
 u8 pcm_last_a5 = 0;
 u8 pcm_samples[PCM_SAMPLE_BUFFER_SIZE] __attribute__((section(".dtcm")));
-volatile u16 pcm_sample_read __attribute__((section(".dtcm"))) = 0;
 volatile u16 pcm_sample_write __attribute__((section(".dtcm"))) = 0;
-u16 pcm_sample_phase __attribute__((section(".dtcm"))) = 0;
 u8 pcm_sample_current __attribute__((section(".dtcm"))) = 128;
+s32 pcm_sample_filtered __attribute__((section(".dtcm"))) = 0;
 u8 s1990_skip_leftover = 0;
 
 // Provides the "PAC OPPL" string needed for some games to detect SRAM
@@ -1028,6 +1027,13 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     {
         pcm_last_a4 = Value;
         pcm_counter = 0x00;
+
+        if (myConfig.pcm && pcm_sample_write < PCM_SAMPLE_BUFFER_SIZE)
+        {
+            pcm_samples[pcm_sample_write] =
+                (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
+            pcm_sample_write++;
+        }
     }
     else if (Port == 0xA5) // PCM
     {
@@ -1573,10 +1579,9 @@ void msx_reset(void)
     pcm_counter = 0;
     pcm_last_a4 = 0;
     pcm_last_a5 = 0;
-    pcm_sample_read = 0;
     pcm_sample_write = 0;
-    pcm_sample_phase = 0;
     pcm_sample_current = 128;
+    pcm_sample_filtered = 0;
     s1990_skip_leftover = 0;
     s1990_is_r800 = 0;
     s1990_reg6 = 0x60;

@@ -2691,19 +2691,6 @@ u32 LoopZ80(void)
     
     CPU.CycleDeficit = ExecZ80(cycles_to_process);
 
-    if (myConfig.pcm)
-    {
-        u16 write = pcm_sample_write;
-        u16 read = pcm_sample_read;
-
-        if ((u16)(write - read) < PCM_SAMPLE_BUFFER_SIZE)
-        {
-            pcm_samples[write & (PCM_SAMPLE_BUFFER_SIZE - 1)] =
-                (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
-            pcm_sample_write = write + 1;
-        }
-    }
-    
     // Run the FDC engine
     LoopFDC();
 
