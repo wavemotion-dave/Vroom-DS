@@ -28,7 +28,7 @@
 //@ Tunables.
 //@----------------------------------------------------------------------------
 #define YM_SAMPLE_RATE 18600            // confirmed value, matches the AY driver's rate
-#define PCM_SCANLINE_RATE 15750
+#define PCM_SCANLINE_RATE (VDP9938_FRAMES * VDP9938_LINES)
 #define YM_MASTER_CLOCK 3579545         // MSX standard clock, same as SCC's
 #define YM_SIN_SHIFT 24                 // phase>>24 -> 8-bit (256 entry) table index
 #define YM_GAIN_RAMP_STEP 16            // Gain ramp toward full level on key-on.

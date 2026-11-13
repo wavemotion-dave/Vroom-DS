@@ -500,7 +500,7 @@ void VroomDSFindFiles(u8 media_id)
         {
             if ((strlen(szFile) > 4) && (strlen(szFile) < (MAX_FILE_NAME_LEN - 4)) && (szFile[0] != '.') && (szFile[0] != '_')) // For MAC don't allow underscore files
             {
-                if (get_file_size(szFile) >= 64)
+                if (get_file_size(szFile) >= (64*1024))
                 {
                     if ((strcasecmp(strrchr(szFile, '.'), ".rom") == 0) && (media_id != MEDIA_DISK))
                     {

@@ -58,11 +58,16 @@ u16 pcm_sample_phase __attribute__((section(".dtcm"))) = 0;
 u8 pcm_sample_current __attribute__((section(".dtcm"))) = 128;
 u8 s1990_skip_leftover = 0;
 
-// ---------------------------------------------------------------------
-// Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
-// ---------------------------------------------------------------------
-u8  sccplus_page[4]     __attribute__((section(".dtcm"))) = {0,1,2,3}; // Last byte written to each of the 4 select regs
-u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/BFFF: bit5=RAM mode, bit4=SCC+ compat
+// Provides the "PAC OPPL" string needed for some games to detect SRAM
+u8 FAKE_FMPAC[0x2000] = {
+    0x00, 0x00, 0x00, 0x00, 0x82, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x41, 0x43, 0x32, 0x4F, 0x50, 0x4C, 0x4C,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 u32 KanjiAdr[2]         = {0,0};     // [0]=level 1, [1]=level 2 (17-bit byte offset)
 
@@ -212,12 +217,10 @@ u8 s1990_is_r800 = 0;
 // Set this according to the emulated machine's physical switch.
 u8 s1990_reg5 = 0;
 
-
 // -------------------------------------------------------------------------------------------------
 // Port E4: Register selection
 // -------------------------------------------------------------------------------------------------
-
-void write_port_E4(u8 Value)
+__attribute__((noinline)) void write_port_E4(u8 Value)
 {
     s1990_reg_idx = Value;
     s1990_skip_leftover = 0;          // new register select = new sequence
@@ -227,7 +230,6 @@ void write_port_E4(u8 Value)
 // -------------------------------------------------------------------------------------------------
 // Port E5: Register access
 // -------------------------------------------------------------------------------------------------
-
 __attribute__((noinline)) u8 read_port_E5(void)
 {
     switch(s1990_reg_idx)
@@ -285,7 +287,7 @@ __attribute__((noinline)) void write_port_E5(u8 Value)
 // Keyboard / Joystick reading is generally done every frame so at most 60 times per second.
 // It's fine to keep this out of ITCM fast memory as it's not a hot spot for emulation.
 // ------------------------------------------------------------------------------------------
-u8 readport_keyboard(void)
+__attribute__((noinline)) u8 readport_keyboard(void)
 {
       // ----------------------------------------------------------
       // Keyboard Port (Japanese Layout)
@@ -480,7 +482,7 @@ u8 readport_keyboard(void)
 }
 
 
-u8 ReadJoystick(void)
+__attribute__((noinline)) u8 ReadJoystick(void)
 {
     u8 joy1 = 0;
 
@@ -1493,10 +1495,11 @@ void MSX_InitialMemoryLayout(void)
     MyMedia[MEDIA_CART2].mapperMask = 0x01;
     MyMedia[MEDIA_CART2].blockSize = 0x2000;
     MyMedia[MEDIA_CART2].mapperType = PAC_SRAM;
+    memset(FAKE_FMPAC+0x20, 0xFF, sizeof(FAKE_FMPAC)-0x20);
 
     MSXCartPtr[MEDIA_CART2][0] = (u8*)Unmapped_Memory;           // Segment Unmapped
     MSXCartPtr[MEDIA_CART2][1] = (u8*)Unmapped_Memory;           // Segment Unmapped
-    MSXCartPtr[MEDIA_CART2][2] = (u8*)Unmapped_Memory;           // Segment Unmapped
+    MSXCartPtr[MEDIA_CART2][2] = (u8*)FAKE_FMPAC;                // Segment Unmapped
     MSXCartPtr[MEDIA_CART2][3] = (u8*)Unmapped_Memory;           // Segment Unmapped
     MSXCartPtr[MEDIA_CART2][4] = (u8*)Unmapped_Memory;           // Segment Unmapped
     MSXCartPtr[MEDIA_CART2][5] = (u8*)Unmapped_Memory;           // Segment Unmapped

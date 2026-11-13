@@ -254,12 +254,6 @@ mm_stream myStream __attribute__((section(".dtcm")));
 // -------------------------------------------------------------------------------------------
 s16 last_sample __attribute__((section(".dtcm"))) = 0;
 
-
-// ------------------------------------------------------------------------------------------------------------
-// On exit from Sound Pause and whenever the sound driver changes (AY -> AY+SCC or AY+MSX-MUSIC), there is a
-// pop/click heard as the new mixer comes online. This routine is designed to perform a simple quick mixing
-// and drive the sample output towards the new target to soften the pop/click. It's not perfect but it helps...
-// ------------------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------------------
 // On exit from Sound Pause and whenever the sound driver changes (AY -> AY+MSX-MUSIC), there is a short
 // pop/click heard as the new mixer comes online. This routine is designed to perform a simple quick mixing
@@ -574,11 +568,11 @@ void DisplayStatusLine(void)
     }
     else if (flash_show_status)
     {
-        DSPrint(29, 0, 0, " ");
+        DSPrint(28, 0, 0, "  ");
+        DSPrint(28, 1, 0, "  ");            
         DSPrint(30, 0, 2, "?"); // Show Flash Write icon
-        DSPrint(31, 0, 0, " ");
-        DSPrint(29, 1, 0, " ");
         DSPrint(30, 1, 2, "_"); // Show Flash Write icon
+        DSPrint(31, 0, 0, " ");
         DSPrint(31, 1, 0, " ");
         if (--flash_show_status == 0)
         {
@@ -589,6 +583,8 @@ void DisplayStatusLine(void)
     {
         if (io_show_status == 8) // Disk Write
         {
+            DSPrint(28, 0, 0, " ");
+            DSPrint(28, 1, 0, " ");            
             DSPrint(29, 0, 2, "678"); // Show Disk icon
             DSPrint(29, 1, 2, "VWX"); // Show Disk icon
             io_show_status = 6;       // Show icon briefly
@@ -599,6 +595,8 @@ void DisplayStatusLine(void)
         }
         else if (io_show_status == 7) // Disk Read
         {
+            DSPrint(28, 0, 0, " ");
+            DSPrint(28, 1, 0, " ");            
             DSPrint(29, 0, 2, "345"); // Show Disk icon
             DSPrint(29, 1, 2, "STU"); // Show Disk icon
             io_show_status = 6;       // Show icon briefly
@@ -1395,7 +1393,7 @@ void VroomDSRunEmu(void)
                             SoundPause();
                             BottomScreenOptions();
                             VroomDSChooseFile(MEDIA_DISK, 0); // Swap disk but do NOT allow directory change
-                            if (ucGameChoice >= 0)               // Did the user select a game?
+                            if (ucGameChoice >= 0)            // Did the user select a game?
                             {
                                 BottomScreenOptions();
                                 DSPrint(11, 13, 6, "LOADING...");
@@ -2698,14 +2696,12 @@ u32 LoopZ80(void)
         u16 write = pcm_sample_write;
         u16 read = pcm_sample_read;
 
-        if ((u16)(write - read) >= PCM_SAMPLE_BUFFER_SIZE)
+        if ((u16)(write - read) < PCM_SAMPLE_BUFFER_SIZE)
         {
-            pcm_sample_read = ++read;
+            pcm_samples[write & (PCM_SAMPLE_BUFFER_SIZE - 1)] =
+                (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
+            pcm_sample_write = write + 1;
         }
-
-        pcm_samples[write & (PCM_SAMPLE_BUFFER_SIZE - 1)] =
-            (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
-        pcm_sample_write = write + 1;
     }
     
     // Run the FDC engine

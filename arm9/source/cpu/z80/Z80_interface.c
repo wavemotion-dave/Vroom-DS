@@ -24,8 +24,6 @@
 #include "../../fdc.h"
 #include "../../printf.h"
 
-u8 sram_write_enabled_a = 0; // Is SRAM writable in segment A (many SRAM games allow writes in 2 segments)
-u8 sram_write_enabled_b = 0; // Is SRAM writable in segment B (many SRAM games allow writes in 2 segments)
 u8 PAC_SRAM_in_view     = 0; // Is the PAC SRAM in view?
 u8 FMPAC_Key1           = 0; // FM-PAC SRAM requires a special key write sequence to open up SRAM access
 
@@ -593,6 +591,8 @@ void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 val
 #define FMPAC_KEY2 0x69
 void __attribute__((noinline)) Handle_PAC_SRAM(u8 media_id, u16 address, u8 value)
 {
+    extern u8*FAKE_FMPAC;
+    
     if (address == 0x5FFE)
     {
         // Key register
@@ -607,7 +607,7 @@ void __attribute__((noinline)) Handle_PAC_SRAM(u8 media_id, u16 address, u8 valu
         else
         {
             PAC_SRAM_in_view = 0;
-            MSXCartPtr[MEDIA_CART2][2] = (u8*)Unmapped_Memory;
+            MSXCartPtr[MEDIA_CART2][2] = (u8*)FAKE_FMPAC;
             MemoryMap[2] = MSXCartPtr[MEDIA_CART2][2] - 0x4000;
         }
         return;
@@ -626,7 +626,7 @@ void __attribute__((noinline)) Handle_PAC_SRAM(u8 media_id, u16 address, u8 valu
         else
         {
             PAC_SRAM_in_view = 0;
-            MSXCartPtr[MEDIA_CART2][2] = (u8*)TURBO_MSXMUSIC;
+            MSXCartPtr[MEDIA_CART2][2] = (u8*)FAKE_FMPAC;
             MemoryMap[2] = MSXCartPtr[MEDIA_CART2][2] - 0x4000;
         }
         return;
@@ -725,8 +725,6 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
 void Z80_Interface_Reset(void)
 {
     CPU.CycleDeficit      = 0;
-    sram_write_enabled_a  = 0;
-    sram_write_enabled_b  = 0;
     PAC_SRAM_in_view      = 0;
     FMPAC_Key1            = 0;
 }
