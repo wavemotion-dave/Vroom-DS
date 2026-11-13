@@ -51,6 +51,11 @@ u32 dos22_bank = 0;
 u8 pcm_counter = 0;
 u8 pcm_last_a4 = 0;
 u8 pcm_last_a5 = 0;
+u8 pcm_samples[PCM_SAMPLE_BUFFER_SIZE] __attribute__((section(".dtcm")));
+volatile u16 pcm_sample_read __attribute__((section(".dtcm"))) = 0;
+volatile u16 pcm_sample_write __attribute__((section(".dtcm"))) = 0;
+u16 pcm_sample_phase __attribute__((section(".dtcm"))) = 0;
+u8 pcm_sample_current __attribute__((section(".dtcm"))) = 128;
 u8 s1990_skip_leftover = 0;
 
 // ---------------------------------------------------------------------
@@ -1565,11 +1570,24 @@ void msx_reset(void)
     pcm_counter = 0;
     pcm_last_a4 = 0;
     pcm_last_a5 = 0;
+    pcm_sample_read = 0;
+    pcm_sample_write = 0;
+    pcm_sample_phase = 0;
+    pcm_sample_current = 128;
     s1990_skip_leftover = 0;
     s1990_is_r800 = 0;
     s1990_reg6 = 0x60;
     s1990_reg_idx = 0;
-    s1990_reg5 = 0;    
+    s1990_reg5 = 0;
+    turbo_r_boost = 0;
+    msx_music_capable_game = 0;
+    special_memory_access = 0x00;
+    msx_music_writes = 0;
+    msx_subslot = 0;
+    msx_subslot0 = 0;
+    turbo_timer = 0;
+    msx_dos22 = 0;
+    dos22_bank = 0;
     
     memset(KanjiAdr, 0x00, sizeof(KanjiAdr));
     

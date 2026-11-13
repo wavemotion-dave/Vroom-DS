@@ -28,6 +28,7 @@
 //@ Tunables.
 //@----------------------------------------------------------------------------
 #define YM_SAMPLE_RATE 18600            // confirmed value, matches the AY driver's rate
+#define PCM_SCANLINE_RATE 15750
 #define YM_MASTER_CLOCK 3579545         // MSX standard clock, same as SCC's
 #define YM_SIN_SHIFT 24                 // phase>>24 -> 8-bit (256 entry) table index
 #define YM_GAIN_RAMP_STEP 16            // Gain ramp toward full level on key-on.
@@ -854,9 +855,29 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 // Melodic FM is rendered at half the output rate; rhythm and filtering
 // remain at the full output rate.
 // -------------------------------------------------------------------------
+static __attribute__((noinline)) s32 PCM_MixSample(void)
+{
+    pcm_sample_phase += PCM_SCANLINE_RATE;
+    if (pcm_sample_phase >= YM_SAMPLE_RATE)
+    {
+        pcm_sample_phase -= YM_SAMPLE_RATE;
+
+        u16 read = pcm_sample_read;
+        if (read != pcm_sample_write)
+        {
+            pcm_sample_current =
+                pcm_samples[read & (PCM_SAMPLE_BUFFER_SIZE - 1)];
+            pcm_sample_read = read + 1;
+        }
+    }
+
+    return ((s32)pcm_sample_current - 128) * 128;
+}
+
 ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 {
     int i;
+    int pcmEnabled = myConfig.pcm;
     int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
     int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
 
@@ -1077,6 +1098,11 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
          */
         sample += (chip->outputFilterState - sample) >> 5;
         chip->outputFilterState = sample;
+
+        if (pcmEnabled)
+        {
+            sample += PCM_MixSample();
+        }
 
         /* Mix one synthesized sample into the existing output buffer. */
         s32 mixed = ((s32)dest[i] + 32768) + sample;

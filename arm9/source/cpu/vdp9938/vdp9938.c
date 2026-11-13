@@ -21,6 +21,8 @@
 
 #define DEBUG_REFRESH(x) //debug[x]++;
 
+#define TURBO_R_WAIT_FACTOR    40
+
 volatile u8 bufferZone1[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
 u8 XBuf[2][256*224] ALIGN(32) = {0};    // V9938/V9958 screen is 256x224 (for overscan). We double-buffer the output.
 volatile u8 bufferZone2[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
@@ -1492,7 +1494,7 @@ void RefreshLine3(u8 uY)
     // R#25 MSK: leftmost 8 pixels show the backdrop (after sprites, so they're masked too)
     if (VDP[25] & 0x02)
     {
-        u32 c = (u32)XPal[BGColor & 0x0F] * 0x01010101u;
+        u32 c = 0x10101010;
         ((u32 *)Row)[0] = c;
         ((u32 *)Row)[1] = c;
     }
@@ -1563,7 +1565,7 @@ static __attribute__((noinline)) void ApplyLeftMask(void)
 {
     if (VDP[25] & 0x02)
     {
-        u32 c = (u32)(BGColor & 0x0F) * 0x01010101u;
+        u32 c = 0x10101010;
         u32 *p32 = (u32*)(LineScratch + LS_BASE);
         p32[0] = c;
         p32[1] = c;
@@ -1767,7 +1769,7 @@ void RefreshLine4(uint8_t Y)
 // ---------------------------------------------------------------------
 // This handles the V9958 horizontal scroll register magic for Screen 5
 // ---------------------------------------------------------------------
-ITCM_CODE const u8 *HandlePageScrollScreen5(const u8 *src)
+const u8 *HandlePageScrollScreen5(const u8 *src)
 {
     if (VDP[25] & 1)
     {
@@ -1809,7 +1811,6 @@ ITCM_CODE const u8 *HandlePageScrollScreen5(const u8 *src)
 
         if (start)
         {
-            debug[15]++;
             int off = start >> 1;
 
             memcpy(ScrollRow, src + off, 128 - off);
@@ -1828,7 +1829,7 @@ ITCM_CODE const u8 *HandlePageScrollScreen5(const u8 *src)
 // VDPStatus[0] on an empty line, so skipping ColorSprites changes nothing.
 // Same Y math and loop as ColorSprites(). Not in ITCM on purpose.
 // ---------------------------------------------------------------------
-ITCM_CODE int Screen5LineHasSprites(uint8_t Y)
+ITCM_CODE static __attribute__((noinline)) int Screen5LineHasSprites(uint8_t Y)
 {
     static const uint8_t SprHeights[4] = { 8,16,16,32 };
 
@@ -1943,6 +1944,7 @@ ITCM_CODE void RefreshLine5(u8 uY)
         }
         else
         {
+
             // Never a direct line, so this always uses the raw LUT.
             u16 *dst16 = (u16*)P;
 
@@ -1977,6 +1979,7 @@ ITCM_CODE void RefreshLine5(u8 uY)
         }
     }
 }
+
 
 /** RefreshLine6() ******************************************/
 /** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
@@ -3138,7 +3141,7 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
 {
   if (turbo_r_boost)
   {
-      CPU.ICount-=((myConfig.cpuBoost+1) * 35);
+      CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
   }
   
   /* There are VDP registers - map down to these and mask off irrelevant bits */
@@ -3199,7 +3202,7 @@ ITCM_CODE byte RdData9938(void)
   
   if (turbo_r_boost)
   {
-      CPU.ICount-=((myConfig.cpuBoost+1) * 35);
+      CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
   }
 
   VDPDlatch = (ScrMode == 8)  ? *VDP9938Screen8DataPointer() : VPAGE[VAddr];
@@ -3250,7 +3253,7 @@ ITCM_CODE void WrCtrl9938(byte value)
 {
     if (turbo_r_boost)
     {
-        CPU.ICount-=((myConfig.cpuBoost+1) * 35);
+        CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
     }
 
   if(VDPCtrlLatch)  // Write the high byte of the video address
@@ -3296,7 +3299,7 @@ ITCM_CODE byte RdCtrl9938(void)
 {
   if (turbo_r_boost)
   {
-      CPU.ICount-=((myConfig.cpuBoost+1) * 35);
+      CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
   }
 
   byte data = VDPStatus[VDP[15]];
@@ -3480,7 +3483,7 @@ void Reset9938(void)
     }
 
     BG_PALETTE[4] = RGB15(1,1,1);   // We need a real black... and index 4 was already very close!
-
+    
     // Set the XPal[] palette index array for Legacy colors
     for (int idx=0; idx<16; idx++)
     {
@@ -3493,6 +3496,8 @@ void Reset9938(void)
     }
 
     XPal[0] =  XPalReal0 = 0;   // Always transparency to start
+    
+    XPal[16] = 4;   // Set to 'almost black' for left border mask (not accurate but we don't show border anyway!)
 
     memset(XBuf,        0x00, sizeof(XBuf));         // Ensure the A:B buffers are clear
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)

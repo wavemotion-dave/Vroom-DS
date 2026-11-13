@@ -1046,6 +1046,7 @@ void ApplyDatabaseTweaks(void)
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.frameSkip      = FS_LIGHT;
         myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.pcm            = 1;
     }
 
     if (strstr(filename, "KARATE") && strstr(filename, "CHAMP"))
@@ -1182,7 +1183,34 @@ void ApplyDatabaseTweaks(void)
         myConfig.MIDI           = 0xFF;
     }
     
-    //zzz
+    if (strstr(filename, "F-NANO"))
+    {
+        myConfig.yOffset        = 7;
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.frameSkip      = FS_LIGHT;
+    }
+
+    if (strstr(filename, "FANTASY") && strstr(filename, "ATTRACTION"))
+    {
+        myConfig.yOffset        = 10;
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+    }
+    
+    if (strstr(filename, "FISHING"))
+    {
+        myConfig.yOffset        = 17;
+        myConfig.fdc_driver     = FDC_WD;
+    }
+
+    if (strstr(filename, "FRAY") && strstr(filename, "MAGICAL"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.pcm            = 1;
+    }
 
     if (strstr(filename, "GUN") && strstr(filename, "SHOT"))
     {
@@ -1191,7 +1219,138 @@ void ApplyDatabaseTweaks(void)
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.dpad           = DPAD_MOUSE;
     }
+    
+    if (strstr(filename, "KATO") && strstr(filename, "MINIGAME"))
+    {
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.pcm            = 1;
+    }
+    
+    if (strstr(filename, "LOST") && strstr(filename, "WORD"))
+    {
+        myConfig.yOffset        = 12;
+        myConfig.fdc_driver     = FDC_WD;
+        MapCursors();
+    }
 
+    if (strstr(filename, "MAGICAL") && strstr(filename, "LAND"))
+    {
+        myConfig.yOffset        = 12;
+        myConfig.fdc_driver     = FDC_WD;
+    }
+
+    if (strstr(filename, "MECHANICAL") && strstr(filename, "BRAIN"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+    }
+
+    if (strstr(filename, "MEJUUSA"))
+    {
+        myConfig.yOffset        = 2;
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_LIGHT;
+    }
+
+    if (strstr(filename, "MOON") && strstr(filename, "SAGA"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_MED;
+        myConfig.frameSkip      = FS_HEAVY;
+    }
+
+    if (strstr(filename, "MULTI") && strstr(filename, "PLEX"))
+    {
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.frameSkip      = FS_NONE;
+    }
+    
+    if (strstr(filename, "MYU") && strstr(filename, "SIOS"))
+    {
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.dpad           = DPAD_MOUSE;
+        myConfig.pcm            = 1;
+    }
+    
+    if (strstr(filename, "PARA") && strstr(filename, "DREAM"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
+        myConfig.frameSkip      = FS_HEAVY;
+    }
+    
+    if (strstr(filename, "RANMA") && strstr(filename, "NIBUNNOICHI"))
+    {
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.dpad           = DPAD_MOUSE;
+        myConfig.pcm            = 1;
+    }
+
+    if (strstr(filename, "SEED") && strstr(filename, "DRAGON"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.pcm            = 1;
+    }
+
+    if (strstr(filename, "SOUTH") && strstr(filename, "HERO"))
+    {
+        myConfig.yOffset        = 5;
+        myConfig.fdc_driver     = FDC_WD;
+    }
+    
+    if (strstr(filename, "SPACE") && strstr(filename, "PANIC"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+    }
+
+    if (strstr(filename, "STAGE") && strstr(filename, "11"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+    }
+
+    if (strstr(filename, "S.T.G."))
+    {
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
+        myConfig.frameSkip      = FS_NONE;
+        MapCursors();
+    }
+
+    if (strstr(filename, "SWEET"))
+    {
+        myConfig.yOffset        = 2;
+        myConfig.fdc_driver     = FDC_WD;
+    }
+    
+    if (strstr(filename, "HAMARAJA") && strstr(filename, "NIGHT"))
+    {
+        myConfig.yOffset        = 15;
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.pcm            = 1;
+    }
+    
+    if (strstr(filename, "TURBO") && strstr(filename, "BLASTER"))
+    {
+        myConfig.fdc_driver     = FDC_WD;
+        myConfig.frameSkip      = FS_NONE;
+    }
+
+    if (strstr(filename, "WELKIS") && strstr(filename, "LEGEND"))
+    {
+        myConfig.yOffset        = 2;
+        myConfig.fdc_driver     = FDC_WD;
+    }
 }
 
 
@@ -1316,7 +1475,7 @@ const struct options_t Option_Table[1][20] =
     // Page 1 - Game Options
     {
         {"MSX MAPPER",      {"GUESS", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "ASCII 16X", "NEO8", "NEO16"},                                                &myConfig.msxMapper,         7},
-        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "MAX"},                                                                                                          &myConfig.cpuBoost,          4},
+        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "MAX", "LUDICRIST"},                                                                                             &myConfig.cpuBoost,          5},
         {"FRAMESKIP",       {"NONE", "LIGHT", "HEAVY"},                                                                                                                 &myConfig.frameSkip,         3},
         {"DPAD",            {"NORMAL", "DIAGONALS", "MOUSE", "SLIDE-N-GLIDE"},                                                                                          &myConfig.dpad,              4},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},

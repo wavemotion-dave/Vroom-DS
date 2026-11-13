@@ -271,7 +271,7 @@ mm_word ClickRemoval(mm_word len, mm_addr dest)
 
     ay38910Mixer(16, mix1, &myAY); // Mix AY and give us something to move towards
 
-    if (msx_music_capable_game)
+    if (msx_music_capable_game || myConfig.pcm)
     {
         YMMixer(len - 16, dest, &myYM); // Keep the YM stepping normally
         YMMixer(16, mix1, &myYM);       // Mix directly on top of AY
@@ -321,7 +321,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         }
 
         ay38910Mixer(len, dest, &myAY);
-        if (msx_music_capable_game)
+        if (msx_music_capable_game || myConfig.pcm)
         {
             YMMixer(len, dest, &myYM);
         }
@@ -435,14 +435,13 @@ void ResetMSX(void)
     msx_kana_lock = 0; // MSX KANA lock off
 
     zoom_screen = 0; // Assume no zoom to start
+    screenPanX = 0;
 
     msxWipeRAM();       // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios(); // Put the BIOS back in place and point to it
 
     keyMapType = 0; // If we go back into options
     
-    turbo_r_boost = 0;  // Normal Z80 speed to start...
-
     // -----------------------------------------------------------
     // Timer 1 is used to time frame-to-frame of actual emulation
     // -----------------------------------------------------------
@@ -566,8 +565,8 @@ void DisplayStatusLine(void)
 
     if (sram_show_status)
     {
-        DSPrint(29, 0, 2, "'()"); // Show SRAM icon
-        DSPrint(29, 1, 2, "GHI"); // Show SRAM icon
+        DSPrint(28, 0, 2, "&'()"); // Show SRAM icon
+        DSPrint(28, 1, 2, "FGHI"); // Show SRAM icon
         if (--sram_show_status == 0)
         {
             msxSaveSRAM();
@@ -619,8 +618,8 @@ void DisplayStatusLine(void)
     // ------------------------------------------------------------
     else
     {
-        DSPrint(29, 0, 0, "   ");
-        DSPrint(29, 1, 0, "   ");
+        DSPrint(28, 0, 0, "    ");
+        DSPrint(28, 1, 0, "    ");
     }
 
     // -----------------------------------------------------------------
@@ -686,19 +685,11 @@ u8 MiniMenu(void)
             touchRead(&touch);
             if ((touch.py >= 22) && (touch.py < 98)) // Top row of Icons
             {
-                if (touch.px <= 64)
-                {
-                    retVal = MENU_CHOICE_SAVE_GAME;
-                }
-                else if (touch.px <= 128)
-                {
-                    retVal = MENU_CHOICE_LOAD_GAME;
-                }
-                else if (touch.px <= 192)
+                if ((touch.px > 60) && (touch.px <= 135))
                 {
                     retVal = MENU_CHOICE_SWAP_DISK;
                 }
-                else if (touch.px <= 256)
+                else if ((touch.px > 135) && (touch.px <= 205))
                 {
                     retVal = MENU_CHOICE_END_GAME;
                 }
@@ -707,19 +698,15 @@ u8 MiniMenu(void)
             }
             if ((touch.py >= 98) && (touch.py < 190)) // Bottom row of Icons
             {
-                if (touch.px <= 64)
-                {
-                    retVal = MENU_CHOICE_HI_SCORE;
-                }
-                else if (touch.px <= 128)
+                if ((touch.px > 25) && (touch.px <= 98))
                 {
                     retVal = MENU_CHOICE_GAME_OPTIONS;
                 }
-                else if (touch.px <= 192)
+                else if ((touch.px > 98) && (touch.px <= 169))
                 {
                     retVal = MENU_CHOICE_DEFINE_KEYS;
                 }
-                else if (touch.px <= 256)
+                else if ((touch.px > 169) && (touch.px <= 235))
                 {
                     retVal = MENU_CHOICE_RESET_GAME;
                 }
@@ -1265,7 +1252,10 @@ void VroomDSRunEmu(void)
                 {
                     zoom_screen = 1;
                 }
-                render_blended = 1; // We Alpha Blend the A/B pixels in Screen 7
+                if (myConfig.frameSkip <= FS_LIGHT)
+                {
+                    render_blended = 1; // We Alpha Blend the A/B pixels in Screen 7
+                }
             }
             else if (ScrMode == 9) // 80 Column Mode (480px)
             {
@@ -2194,6 +2184,7 @@ int main(int argc, char **argv)
         //Kanji Driver + BASIC	0x074000	32 KB	0x07BFFF
         //MSX-MUSIC	            0x07C000	16 KB	0x07FFFF
         FILE *fp = fopen("/roms/bios/fs-a1gt_firmware.rom", "rb");
+        u8 bShowWarning = 0;
         if (fp)
         {
             fseek(fp, 0x048000, SEEK_SET);
@@ -2230,6 +2221,10 @@ int main(int argc, char **argv)
                 fread(KANJI_FONT, 1, 256*1024, fp);
                 fclose(fp);
             }
+            else
+            {
+                bShowWarning = 1;
+            }
 
             fp = fopen("/roms/bios/ascii_msxdos22.rom", "rb");
             if (!fp) fp = fopen("/roms/bios/MDOS22V3.ROM", "rb");
@@ -2239,8 +2234,24 @@ int main(int argc, char **argv)
                 fread(TURBO_DOS22, 1, 64*1024, fp);
                 fclose(fp);
             }
+            else
+            {
+                bShowWarning = 1;
+            }
+            
+            // Make sure the DOS 2.2 is one of the 4 that we know to work...
+            u32 dos2_crc = getCRC32(TURBO_DOS22, 64*1024);
+            if ((dos2_crc != 0x1c430991) && (dos2_crc != 0x47eea028) && (dos2_crc != 0x845f5ab6) && (dos2_crc != 0x8687c4f1))
+            {
+                bShowWarning = 1;
+            }
         }
         else
+        {
+            bShowWarning = 1;
+        }
+        
+        if (bShowWarning)
         {
             ShowWarning(2);
             for (;;)
@@ -2248,6 +2259,7 @@ int main(int argc, char **argv)
                 WAITVBL;
             }
         }
+        
     }
     else // We can't support older DS-Lite/Phat for Turbo-R emulation
     {
@@ -2680,6 +2692,21 @@ u32 LoopZ80(void)
     pcm_counter++;
     
     CPU.CycleDeficit = ExecZ80(cycles_to_process);
+
+    if (myConfig.pcm)
+    {
+        u16 write = pcm_sample_write;
+        u16 read = pcm_sample_read;
+
+        if ((u16)(write - read) >= PCM_SAMPLE_BUFFER_SIZE)
+        {
+            pcm_sample_read = ++read;
+        }
+
+        pcm_samples[write & (PCM_SAMPLE_BUFFER_SIZE - 1)] =
+            (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
+        pcm_sample_write = write + 1;
+    }
     
     // Run the FDC engine
     LoopFDC();
