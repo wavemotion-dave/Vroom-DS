@@ -45,10 +45,15 @@ The Vroom-DS emulator is offered as-is, without any warranty.
 
 Credit to @PantheonMusic - Opening "Fast Pace Dramatic Score" music
 
+Known Issues :
+-----------------------
+* Speed is not fully accurate. It's the best I could do on the little handheld... some games play just fine and others will have slowdown.
+* The MSX Translations version of Illusion City only runs in the 4MB ASC16X ROM version (which is more convenient anyway). You can use Flash or Disk to save progress.
+* STG Special has major graphical glitches happening in the score area. Reason unknown.
+* Don't try to run non-Turbo-R games on this thing... most of the MSX mappers are not present and SCC emulation is missing. Use Hachibitto for your general MSX emulation needs - this is to play around with Turbo R games.
 
 Version History :
 -----------------------
-
 Version 0.5 - 13-Nov-2026 by wavemotion-dave
 * First beta version released.
 
