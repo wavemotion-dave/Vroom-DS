@@ -575,11 +575,11 @@ void DisplayStatusLine(void)
     else if (flash_show_status)
     {
         DSPrint(29, 0, 0, " ");
-        DSPrint(21, 0, 2, "?"); // Show Flash Write icon
-        DSPrint(22, 0, 0, " ");
+        DSPrint(30, 0, 2, "?"); // Show Flash Write icon
+        DSPrint(31, 0, 0, " ");
         DSPrint(29, 1, 0, " ");
-        DSPrint(21, 1, 2, "_"); // Show Flash Write icon
-        DSPrint(22, 1, 0, " ");
+        DSPrint(30, 1, 2, "_"); // Show Flash Write icon
+        DSPrint(31, 1, 0, " ");
         if (--flash_show_status == 0)
         {
             MsxSaveFlash();
