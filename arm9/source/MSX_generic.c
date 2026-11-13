@@ -1112,6 +1112,14 @@ void ApplyDatabaseTweaks(void)
         myConfig.fdc_driver     = FDC_TOSH;
     }
 
+    if (strstr(filename, "TREASURE") && strstr(filename, "BABYLON"))
+    {
+        myConfig.yOffset        = 18;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.fdc_driver     = FDC_TOSH;
+    }
+    
     // Floppy Games
     if (strstr(filename, "2021") && strstr(filename, "SNOOKY"))
     {
@@ -1214,6 +1222,10 @@ void SetDefaultGameConfig(void)
     myConfig.ymScale = YM_BAL_MED;              // Normal YM is scaled mid-level
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
     myConfig.MIDI = 0x05;
+    myConfig.pcm = 0;
+    myConfig.reserved0 = 0;
+    myConfig.reserved1 = 0;
+    myConfig.reserved2 = 0;
     myConfig.reserved3 = 0;
     myConfig.reserved4 = 0;
     myConfig.reserved5 = 0;
@@ -1312,6 +1324,7 @@ const struct options_t Option_Table[1][20] =
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
         {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},
+        {"PCM",             {"DISABLED", "ENABLED"},                                                                                                                    &myConfig.pcm,               2},
         {"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
         {"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},

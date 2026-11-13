@@ -49,6 +49,10 @@ u8 last_port_41 = 0xFF;
 u8 msx_dos22 = 0;
 u32 dos22_bank = 0;
 u8 pcm_counter = 0;
+u8 pcm_last_a4 = 0;
+u8 pcm_last_a5 = 0;
+u8 s1990_skip_leftover = 0;
+
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
 // ---------------------------------------------------------------------
@@ -211,6 +215,7 @@ u8 s1990_reg5 = 0;
 void write_port_E4(u8 Value)
 {
     s1990_reg_idx = Value;
+    s1990_skip_leftover = 0;          // new register select = new sequence
 }
 
 
@@ -218,7 +223,7 @@ void write_port_E4(u8 Value)
 // Port E5: Register access
 // -------------------------------------------------------------------------------------------------
 
-u8 read_port_E5(void)
+__attribute__((noinline)) u8 read_port_E5(void)
 {
     switch(s1990_reg_idx)
     {
@@ -242,26 +247,23 @@ u8 read_port_E5(void)
     }
 }
 
-
-void write_port_E5(u8 Value)
+__attribute__((noinline)) void write_port_E5(u8 Value)
 {
     switch(s1990_reg_idx)
     {
         case 6:
-            // Bit 7 requests a hardware reset.
-            if(Value & 0x80)
+            if (s1990_skip_leftover)
             {
-                // Hardware reset handling can be added here.
+                s1990_skip_leftover = 0;
+                if (Value & 0x20) break;          // leftover Z80 write after a Z80->R800 switch: drop it
             }
-
-            // Only bits 5 and 6 are writable.
+            
             s1990_reg6 = Value & 0x60;
-
-            // Update active CPU selection.
-            s1990_is_r800 = (s1990_reg6 & 0x40) != 0;
-
-            extern u8 turbo_r_boost;
+            s1990_is_r800 = !(s1990_reg6 & 0x20);
             turbo_r_boost = s1990_is_r800;
+
+            if (s1990_is_r800)
+                s1990_skip_leftover = 1;   // an E4h select clears it, so a real switch back to Z80 still works
 
             break;
 
@@ -543,8 +545,6 @@ static MouseState mouse;
 
 #define MOUSE_TIMEOUT_LINES 16   // ~1 ms at 63.5 us/line; tune if a game misses motion
 
-static inline s32 Clamp8(s32 v) { return v > 127 ? 127 : (v < -128 ? -128 : v); }
-
 void Mouse_Reset(void) { memset(&mouse, 0, sizeof(mouse)); }
 
 #define MOUSE_DPAD_SPEED  2
@@ -611,6 +611,26 @@ __attribute__((noinline)) u8 Mouse_Read(void)
     return 0xC0 | b | n;
 }
 
+__attribute__((noinline)) void read_joystick_or_mouse(void)
+{
+    if ((myAY.ayPortBOut & 0x40) == 0)
+    {
+        if (myConfig.dpad == DPAD_MOUSE)
+        {
+            myAY.ayPortAIn = Mouse_Read();
+        }
+        else
+        {
+            myAY.ayPortAIn = ~ReadJoystick();
+        }
+    }
+    else
+    {
+        myAY.ayPortAIn = 0xFF;
+    }
+}
+
+
 // --------------------------------------------------------------------
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, SCC, RTC, keyboard, etc.
@@ -635,21 +655,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
       // -------------------------------------------
       if (myAY.ayRegIndex == 14)
       {
-          if ((myAY.ayPortBOut & 0x40) == 0)
-          {
-              if (myConfig.dpad == DPAD_MOUSE)
-              {
-                  myAY.ayPortAIn = Mouse_Read();
-              }
-              else
-              {
-                  myAY.ayPortAIn = ~ReadJoystick();
-              }
-          }
-          else
-          {
-              myAY.ayPortAIn = 0xFF;
-          }
+          read_joystick_or_mouse();
       }
       else if (myAY.ayRegIndex == 15)
       {
@@ -708,13 +714,12 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   }
   else if (Port == 0xA4)
   {
-      return pcm_counter;
+      return (pcm_counter & 3); // 2-bit free running counter...
   }
-  else if (Port == 0xA5) // PCM
+  else if (Port == 0xA5) // PCM status
   {
-      static u8 PCM_status=0;
-      PCM_status ^= 2;
-      return PCM_status;
+      byte comp = (0x80 >= pcm_last_a4) ? 0x80 : 0x00;  // pcm_dvalue = last byte written to A4h
+      return comp | (pcm_last_a5 & 0x1F);               // pcm_status = last byte written to A5h
   }
   else if (Port == 0xF3)
   {
@@ -1014,7 +1019,12 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     }
     else if (Port == 0xA4) // PCM
     {
+        pcm_last_a4 = Value;
         pcm_counter = 0x00;
+    }
+    else if (Port == 0xA5) // PCM
+    {
+        pcm_last_a5 = Value;
     }
     else if (Port == 0xA8) // Slot system for MSX
     {
@@ -1552,8 +1562,15 @@ void msx_reset(void)
     msx_init = 0x4000;
     msx_basic = 0x0000;
     last_f4 = 0x00;
-    s1990_is_r800 = 0;
     pcm_counter = 0;
+    pcm_last_a4 = 0;
+    pcm_last_a5 = 0;
+    s1990_skip_leftover = 0;
+    s1990_is_r800 = 0;
+    s1990_reg6 = 0x60;
+    s1990_reg_idx = 0;
+    s1990_reg5 = 0;    
+    
     memset(KanjiAdr, 0x00, sizeof(KanjiAdr));
     
     mirror_ram_bank[0] = 3;
