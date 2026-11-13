@@ -45,6 +45,10 @@ The Vroom-DS emulator is offered as-is, without any warranty.
 
 Credit to @PantheonMusic - Opening "Fast Pace Dramatic Score" music
 
+Virtual Slot Map :
+-----------------------
+![Slot Map](images/slotmap.png)
+
 Known Issues :
 -----------------------
 * Speed is not fully accurate. It's the best I could do on the little handheld... some games play just fine and others will have slowdown.
