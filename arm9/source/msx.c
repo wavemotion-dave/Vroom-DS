@@ -37,7 +37,7 @@ u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0
 u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;      // True if game is making use of MSX-MUSIC (YM Sound)
 u8 special_memory_access    __attribute__((section(".dtcm"))) = 0x00;   // This lets us know we've got something special mapped into memory
 u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;      // If we cross a threshold, we decare we are MSX-MUSIC capable (and mix in the proper sound)
-u8 msx_subslot              __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
+u8 msx_subslot3              __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
 u8 msx_subslot0             __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
 u16 turbo_timer             __attribute__((section(".dtcm"))) = 0x0000; // Rough Turbo-R timer handling - advanced 16 ticks every scanline.
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
@@ -61,12 +61,7 @@ u8 s1990_skip_leftover = 0;
 u8 FAKE_FMPAC[0x2000] = {
     0x00, 0x00, 0x00, 0x00, 0x82, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x41, 0x43, 0x32, 0x4F, 0x50, 0x4C, 0x4C,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+};
 
 u32 KanjiAdr[2]         = {0,0};     // [0]=level 1, [1]=level 2 (17-bit byte offset)
 
@@ -743,12 +738,16 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   return(NORAM);
 }
 
+// ------------------------------------------------------------------------------
+// Slot map for this emulation roughly resembles the Panasonic A1GT machine but 
+// without the Panasonic mapper in slot 3-3 and with the PAC-SRAM in slot 2.
+// ------------------------------------------------------------------------------
 void msx_slot_map_turboR(unsigned char Value)
 {
-    special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE;  // Until proven otherwise below...
+    special_memory_access &= ~SPEC_MEM_SUBSLOT3_ACTIVE;  // Until proven otherwise below...
     special_memory_access &= ~SPEC_MEM_SUBSLOT0_ACTIVE; // Until proven otherwise below...
     special_memory_access &= ~SPEC_MEM_DISK_CONTROLLER;
-    special_memory_access &= ~SPEC_MEM_DOS22;
+    special_memory_access &= ~SPEC_MEM_EXTDOS22;
 
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -783,12 +782,12 @@ void msx_slot_map_turboR(unsigned char Value)
         case 0x03:  // Slot 3:  This is an expanded slot... has Extended BIOS and Disk Controller ROMs
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            if (((msx_subslot & 0x03) >> 0) == 1) // Subslot 1 has Extended BIOS
+            if (((msx_subslot3 & 0x03) >> 0) == 1) // Subslot 1 has Extended BIOS
             {
                 MemoryMap[0] = (u8 *)TURBO_SUB;
                 MemoryMap[1] = (u8 *)TURBO_SUB;
             }
-            else if (((msx_subslot & 0x03) >> 0) == 0) // Subslot 0 has RAM Mapper
+            else if (((msx_subslot3 & 0x03) >> 0) == 0) // Subslot 0 has RAM Mapper
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 1;
@@ -806,37 +805,37 @@ void msx_slot_map_turboR(unsigned char Value)
     switch ((Value>>2) & 0x03)  // Page 1 [0x4000~0x7FFF]
     {
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
-            if (((msx_subslot0 & 0x0C) >> 2) == 0) // Subslot 0 has main ROM
+            if (((msx_subslot0 & 0x0C) >> 2) == 0) // Subslot 0-0 has main ROM
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
                 MemoryMap[2] = TURBO_BIOS;
                 MemoryMap[3] = TURBO_BIOS;
             }
-            else if (((msx_subslot0 & 0x0C) >> 2) == 1) // Subslot 1 FDC Disk Driver
+            else if (((msx_subslot0 & 0x0C) >> 2) == 1) // Subslot 0-1 FDC Disk Driver
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
-                if (myConfig.fdc_driver == 0)
+                if (myConfig.fdc_driver == 0) // WD-2973 FDC driver
                 {
                     special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
                     MemoryMap[2] = (u8 *)TURBO_DISK + 0x0000 - 0x4000;
                     MemoryMap[3] = (u8 *)TURBO_DISK + 0x2000 - 0x6000;
                 }
-                else // Using 2.3 Driver, the disk controller is baked into TURBO_DOS23[]
+                else // Using 2.3 Turbo-R integrated driver, the disk controller is baked into TURBO_DOS23[] 64K ROM
                 {
                     MemoryMap[2] = (u8 *)Unmapped_Memory - 0x4000;
                     MemoryMap[3] = (u8 *)Unmapped_Memory - 0x6000;
                 }
             }
-            else if (((msx_subslot0 & 0x0C) >> 2) == 2) // Subslot 2 has MSX-MUSIC
+            else if (((msx_subslot0 & 0x0C) >> 2) == 2) // Subslot 0-2 has MSX-MUSIC
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
                 MemoryMap[2] = TURBO_MSXMUSIC + 0x0000 - 0x4000;
                 MemoryMap[3] = TURBO_MSXMUSIC + 0x2000 - 0x6000;
             }
-            else if (((msx_subslot0 & 0x0C) >> 2) == 3) // Subslot 3 has Opening ROM
+            else if (((msx_subslot0 & 0x0C) >> 2) == 3) // Subslot 0-3 has Opening ROM
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
@@ -866,28 +865,28 @@ void msx_slot_map_turboR(unsigned char Value)
         case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            if (((msx_subslot & 0x0C) >> 2) == 0) // Subslot 0 has RAM Mapper
+            if (((msx_subslot3 & 0x0C) >> 2) == 0) // Subslot 3-0 has RAM Mapper
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 1;
                 MemoryMap[2] = (u8 *)(MSXRamPtr[2]) - 0x4000;
                 MemoryMap[3] = (u8 *)(MSXRamPtr[3]) - 0x6000;
             }
-            else if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Kanji
+            else if (((msx_subslot3 & 0x0C) >> 2) == 1) // Subslot 3-1 has Kanji
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
                 MemoryMap[2] = (u8 *)TURBO_KANJI+0x0000 - 0x4000;
                 MemoryMap[3] = (u8 *)TURBO_KANJI+0x2000 - 0x6000;
             }
-            else if (((msx_subslot & 0x0C) >> 2) == 2) // Subslot 2 has the DOS mapper ROM
+            else if (((msx_subslot3 & 0x0C) >> 2) == 2) // Subslot 3-2 has the DOS mapper ROM
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
                 if (msx_dos22)
                 {
                     u8 *dos_rom = (myConfig.fdc_driver == 1) ? TURBO_DOS23 : TURBO_DOS22;
-                    special_memory_access |= myConfig.fdc_driver == 1 ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_DOS22;
+                    special_memory_access |= myConfig.fdc_driver == 1 ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_EXTDOS22;
                     MemoryMap[2] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
                     MemoryMap[3] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
                 }
@@ -926,14 +925,14 @@ void msx_slot_map_turboR(unsigned char Value)
             MemoryMap[5] = (u8 *)(MSXCartPtr[MEDIA_CART2][5]) - 0xA000;
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
-            if (((msx_subslot & 0x30) >> 4) == 0) // Subslot 0 has RAM Mapper
+            if (((msx_subslot3 & 0x30) >> 4) == 0) // Subslot 3-0 has RAM Mapper
             {
                 bCartInPage[2] = 0;
                 bRAMInPage[2] = 1;
                 MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
                 MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
             }
-            else if (((msx_subslot & 0x30) >> 4) == 1) // Subslot 1 has Kanji
+            else if (((msx_subslot3 & 0x30) >> 4) == 1) // Subslot 3-1 has Kanji
             {
                 bCartInPage[2] = 0;
                 bRAMInPage[2] = 0;
@@ -971,16 +970,16 @@ void msx_slot_map_turboR(unsigned char Value)
             MemoryMap[6] = (u8 *)(MSXCartPtr[MEDIA_CART2][6]) - 0xC000;
             MemoryMap[7] = (u8 *)(MSXCartPtr[MEDIA_CART2][7]) - 0xE000;
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
-            special_memory_access |= SPEC_MEM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
-            if (((msx_subslot & 0xC0) >> 6) == 0) // Subslot 0 has RAM Mapper
+        case 0x03:  // Slot 3: Expanded
+            special_memory_access |= SPEC_MEM_SUBSLOT3_ACTIVE; // Opens up 0xFFFF
+            if (((msx_subslot3 & 0xC0) >> 6) == 0) // Subslot 3-0 has RAM Mapper
             {
                 bCartInPage[3] = 0;
                 bRAMInPage[3] = 1;
                 MemoryMap[6] = (u8 *)(MSXRamPtr[6]) - 0xC000;
                 MemoryMap[7] = (u8 *)(MSXRamPtr[7]) - 0xE000;
             }
-            else
+            else // Other subslots have nothing mapped in...
             {
                 bCartInPage[3] = 0;
                 bRAMInPage[3] = 0;
@@ -1460,7 +1459,7 @@ void MSX_InitialMemoryLayout(void)
     // ----------------------------------
     msx_music_writes = 0;
     special_memory_access = 0x00;
-    msx_subslot = 0x00;
+    msx_subslot3 = 0x00;
     msx_subslot0 = 0x00;
 
     // -----------------------------------------
@@ -1591,7 +1590,7 @@ void msx_reset(void)
     msx_music_capable_game = 0;
     special_memory_access = 0x00;
     msx_music_writes = 0;
-    msx_subslot = 0;
+    msx_subslot3 = 0;
     msx_subslot0 = 0;
     turbo_timer = 0;
     msx_dos22 = 0;

@@ -123,10 +123,10 @@ extern struct GlobalConfig_t myGlobalConfig;
 
 extern u8 special_memory_access;                // 0x00 if no special access, otherwise one or more of the SPEC_MEM_xxx below
 
-#define SPEC_MEM_SUBSLOT_ACTIVE     0x01        // Allows read/write to special SubSlot register at 0xFFFF - Slot 3
+#define SPEC_MEM_SUBSLOT3_ACTIVE    0x01        // Allows read/write to special SubSlot register at 0xFFFF - Slot 3
 #define SPEC_MEM_SUBSLOT0_ACTIVE    0x02        // Allows read/write to special SubSlot register at 0xFFFF - Slot 0
-#define SPEC_MEM_DOS22              0x04        // External DOS 2.2 mapped into view
-#define SPEC_MEM_DISK_CONTROLLER    0x08        // Disk Controller - either internal or external
+#define SPEC_MEM_EXTDOS22           0x04        // External DOS 2.2 mapped into view
+#define SPEC_MEM_DISK_CONTROLLER    0x08        // Disk Controller - either internal (Turbo-R 64K integrated) or external (16K Standalone)
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
@@ -218,7 +218,7 @@ extern u8 key_ctrl;
 extern u8 key_kana;
 extern u8 key_graph;
 extern u8 msx_music_capable_game;
-extern u8 msx_subslot;
+extern u8 msx_subslot3;
 extern u8 msx_subslot0;
 extern u8 XPalReal0;
 extern u8 ALatch;

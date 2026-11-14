@@ -527,7 +527,7 @@ void ShowDebugZ80(void)
         if ((VDP[25] & 0x18) == 0x18) screen = 11;
         else if ((VDP[25] & 0x18) == 0x08) screen = 12;
     }
-    sprintf(tmpStr, "S%-2d A8=%02X %02X", screen, Port_PPI_A, msx_subslot);
+    sprintf(tmpStr, "S%-2d A8=%02X %02X", screen, Port_PPI_A, msx_subslot3);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "FD.ST=%02X CM=%02X", FDC.status, FDC.command);
     DSPrint(0, idx++, 7, tmpStr);
@@ -2677,6 +2677,8 @@ u32 LoopZ80(void)
     u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit; // Default to Z80 timing
     H_BlankCycles = 54;
 
+    // When we are in R800 mode, we boost the CPU cycles. This isn't true R800 / Turbo-R 
+    // emulation but it's close enough to get games running reasonably correctly. 
     if (turbo_r_boost)
     {
         cycles_to_process += 600 + (myConfig.cpuBoost * 114);

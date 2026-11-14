@@ -51,12 +51,12 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
         if (address == 0x7FFF) return fdc_read(4);
         else return fdc_read(address & 7);
     }
-    else if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
+    else if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
         if (special_memory_access & SPEC_MEM_SUBSLOT0_ACTIVE)
             return (u8)~msx_subslot0; // Compliment is returned.
         else
-            return (u8)~msx_subslot;  // Compliment is returned.
+            return (u8)~msx_subslot3;  // Compliment is returned.
     }
 
     // Otherwise normal read - just index into the 8K memory block and fetch the byte...
@@ -507,13 +507,13 @@ void __attribute__((noinline)) HandleNeo16(u8 media_id, u16 address, u8 value)
 void __attribute__((noinline)) HandleMSXDOS2(u16 address, u8 value)
 {
     dos22_bank = (value & 3);
-    u8 *dos_rom = (myConfig.fdc_driver == 1) ? TURBO_DOS23 : TURBO_DOS22;
+    u8 *dos_rom = TURBO_DOS22;
     u8 *src = dos_rom + (dos22_bank * 0x4000);
 
-    if ((address == 0x7FFE) || (address == 0x7FF0))
+    if (address == 0x7FFE) // The hot-spot for the ASCII external DOS2.2
     {
-        MemoryMap[2] = (u8*)src - 0x4000;
-        MemoryMap[3] = (u8*)src - 0x4000;;
+        MemoryMap[2] = (u8*)src + 0x0000 - 0x4000;
+        MemoryMap[3] = (u8*)src + 0x2000 - 0x6000;
     }
 }
 
@@ -582,16 +582,16 @@ void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 val
 }
 
 
-// -------------------------------------------------------------------
-// The FM-PAC presents 8K of SRAM for a game to use to save progress.
+// --------------------------------------------------------------------
+// The PAC-SRAM presents 8K of SRAM for a game to use to save progress.
 // This handler is called when any byte in the 0x4000-0x5FFF range is
 // written and will determine if/when the SRAM is available.
-// -------------------------------------------------------------------
+// --------------------------------------------------------------------
 #define FMPAC_KEY1 0x4D
 #define FMPAC_KEY2 0x69
 void __attribute__((noinline)) Handle_PAC_SRAM(u8 media_id, u16 address, u8 value)
 {
-    extern u8*FAKE_FMPAC;
+    extern u8* FAKE_FMPAC;
     
     if (address == 0x5FFE)
     {
@@ -642,25 +642,30 @@ void __attribute__((noinline)) Handle_PAC_SRAM(u8 media_id, u16 address, u8 valu
 
 // --------------------------------------------------------------------
 // Handle writes to the Disk Controller (FDC) memory mapped registers.
+// The fdc_write() handler will route the request to the appropriate 
+// controller: either the WD-2973 or the Toshiba TC controller.
 // --------------------------------------------------------------------
 void __attribute__((noinline)) HandleDiskControl(u16 address, u8 value)
 {
+    // For the TC Toshiba FDC driver...
     if (myConfig.fdc_driver == 1)
     {
         fdc_write(address & 0x0F, value);
+        
         if (address == 0x7FF0)
         {
             dos22_bank = (value & 3);
             u8 *disk_rom = TURBO_DOS23 + (dos22_bank * 0x4000);
-            MemoryMap[2] = disk_rom - 0x4000;
+            MemoryMap[2] = disk_rom + 0x0000 - 0x4000;
             MemoryMap[3] = disk_rom + 0x2000 - 0x6000;
         }
-        return;
     }
-
-    if (address <= 0x7FFB) fdc_write(address & 3, value);
-    if (address == 0x7FFC) fdc_setSide((value & 1) ? 1:0);  // Side: [xxxxxxxS]
-    if (address == 0x7FFD) fdc_setDrive((value & 3));       // Drive: [xxxxxxDD]
+    else // For the WD-2973 FDC driver...
+    {
+        if (address <= 0x7FFB) fdc_write(address & 3, value);   // Command/data
+        if (address == 0x7FFC) fdc_setSide((value & 1) ? 1:0);  // Side: [xxxxxxxS]
+        if (address == 0x7FFD) fdc_setDrive((value & 3));       // Drive: [xxxxxxDD]
+    }
 }
 
 typedef void (*MapperWriteHandler)(u8 media_id, u16 address, u8 value);
@@ -684,21 +689,21 @@ static MapperWriteHandler const mapperWriteHandlers[END_MAPPERS] __attribute__((
 // ---------------------------------------------------------------------
 ITCM_CODE void cpu_writemem16(u16 address, u8 value)
 {
-    if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
+    if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
         if (special_memory_access & SPEC_MEM_SUBSLOT0_ACTIVE) msx_subslot0 = value;
-        else msx_subslot = value;
+        else msx_subslot3 = value;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
     }
     else if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
     {
         MemoryMap[address>>13][address]=value;
     }
-    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF0) && (address <= 0x7FFF)) // Disk controller memory map...
+    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF0) && (address <= 0x7FFF)) // Disk controller memory map... (including Turbo-R DOS 2.3 if enabled)
     {
         HandleDiskControl(address, value);
     }
-    else if ((special_memory_access & SPEC_MEM_DOS22) && (address >= 0x7FFE) && (address <= 0x7FFF)) // DOS2 memory map...
+    else if ((special_memory_access & SPEC_MEM_EXTDOS22) && (address >= 0x7FFE) && (address <= 0x7FFF)) // External MSX-DOS 2.2 memory map...
     {
         HandleMSXDOS2(address, value);
     }

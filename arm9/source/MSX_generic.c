@@ -1485,8 +1485,8 @@ const struct options_t Option_Table[1][20] =
         {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},
         {"PCM",             {"DISABLED", "ENABLED"},                                                                                                                    &myConfig.pcm,               2},
         {"DISK SOUND",      {"OFF", "ON"},                                                                                                                              &myGlobalConfig.bDiskSounds, 2},        
-        //{"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
-        //{"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
+        {"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
+        {"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},
     },
 };
