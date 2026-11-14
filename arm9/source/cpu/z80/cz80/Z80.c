@@ -1,5 +1,5 @@
 /******************************************************************************
-*  Hachibitto Z80 CPU
+*  Vroom-DS Z80 CPU
 *
 * Note: Most of this file is from the ColEm emulator core by Marat Fayzullin
 *       but heavily modified for specific NDS use. If you want to use this
@@ -388,7 +388,11 @@ static void CodesED(void)
 
   switch(I)
   {
+#define CYCLES_REPEAT_EXIT 5
+#define CYCLES_BLOCK_EXIT 5
 #include "CodesED.h"
+#undef CYCLES_REPEAT_EXIT
+#undef CYCLES_BLOCK_EXIT
     case PFX_ED:
       CPU.PC.W--;break;
     default:
@@ -444,6 +448,123 @@ static void CodesFD(void)
 #undef XX
 }
 
+static void CodesCB_R800(void)
+{
+  register byte I;
+
+  I=OpZ80(CPU.PC.W++);
+  CPU.ICount-=CyclesCBR800[I];
+
+  switch(I)
+  {
+#include "CodesCB.h"
+    default:
+      if(CPU.TrapBadOps)  Trap_Bad_Ops(" CB ", I, CPU.PC.W-2);
+  }
+}
+
+static void CodesDDCB_R800(void)
+{
+  register pair J;
+  register byte I;
+
+#define XX IX
+  J.W=CPU.XX.W+(offset)OpZ80(CPU.PC.W++);
+  I=OpZ80(CPU.PC.W++);
+  CPU.ICount-=CyclesXCBR800[I];
+
+  switch(I)
+  {
+#include "CodesXCB.h"
+  }
+#undef XX
+}
+
+static void CodesFDCB_R800(void)
+{
+  register pair J;
+  register byte I;
+
+#define XX IY
+  J.W=CPU.XX.W+(offset)OpZ80(CPU.PC.W++);
+  I=OpZ80(CPU.PC.W++);
+  CPU.ICount-=CyclesXCBR800[I];
+
+  switch(I)
+  {
+#include "CodesXCB.h"
+  }
+#undef XX
+}
+
+static void CodesED_R800(void)
+{
+  register byte I;
+  register pair J;
+
+  I=OpZ80(CPU.PC.W++);
+  CPU.ICount-=CyclesEDR800[I];
+
+  switch(I)
+  {
+#define CYCLES_REPEAT_EXIT 1
+#define CYCLES_BLOCK_EXIT 0
+#include "CodesED.h"
+#undef CYCLES_REPEAT_EXIT
+#undef CYCLES_BLOCK_EXIT
+    case PFX_ED:
+      CPU.PC.W--;break;
+    default:
+      if(CPU.TrapBadOps) Trap_Bad_Ops(" ED ", I, CPU.PC.W-4);
+  }
+}
+
+static void CodesDD_R800(void)
+{
+  register byte I;
+  register pair J;
+
+#define XX IX
+  I=OpZ80(CPU.PC.W++);
+  CPU.ICount-=CyclesXXR800[I];
+
+  switch(I)
+  {
+#include "CodesXX.h"
+    case PFX_FD:
+    case PFX_DD:
+      CPU.PC.W--;break;
+    case PFX_CB:
+      CodesDDCB_R800();break;
+    default:
+      if(CPU.TrapBadOps)  Trap_Bad_Ops(" DD ", I, CPU.PC.W-2);
+  }
+#undef XX
+}
+
+static void CodesFD_R800(void)
+{
+  register byte I;
+  register pair J;
+
+#define XX IY
+  I=OpZ80(CPU.PC.W++);
+  CPU.ICount-=CyclesXXR800[I];
+
+  switch(I)
+  {
+#include "CodesXX.h"
+    case PFX_FD:
+    case PFX_DD:
+      CPU.PC.W--;break;
+    case PFX_CB:
+      CodesFDCB_R800();break;
+    default:
+      if(CPU.TrapBadOps)  Trap_Bad_Ops(" FD ", I, CPU.PC.W-2);
+  }
+#undef XX
+}
+
 /** ResetZ80() ***********************************************/
 /** This function can be used to reset the register struct  **/
 /** before starting execution with Z80(). It sets the       **/
@@ -483,7 +604,7 @@ void ResetZ80(Z80 *R)
 /** negative, and current register values in R.             **/
 /*************************************************************/
 #ifdef EXECZ80
-ITCM_CODE int ExecZ80(register int RunCycles)
+int ExecZ80(register int RunCycles)
 {
   register byte I;
   register pair J;
@@ -494,14 +615,20 @@ ITCM_CODE int ExecZ80(register int RunCycles)
     while(CPU.ICount>0)
     {
       /* Read opcode and count cycles */
-      
+
       I=MM[CPU.PC.W>>13][CPU.PC.W]; CPU.PC.W++;
       CPU.ICount-=Cycles[I];
-      
+
       /* Interpret opcode */
       switch(I)
       {
+#define CYCLES_JR_NOT_TAKEN 5
+#define CYCLES_CALL_TAKEN 7
+#define CYCLES_RET_TAKEN 6
 #include "Codes.h"
+#undef CYCLES_JR_NOT_TAKEN
+#undef CYCLES_CALL_TAKEN
+#undef CYCLES_RET_TAKEN
         case PFX_CB: CodesCB();break;
         case PFX_ED: CodesED();break;
         case PFX_FD: CodesFD();break;
@@ -522,6 +649,53 @@ ITCM_CODE int ExecZ80(register int RunCycles)
     }
   }
 }
+
+ITCM_CODE int ExecR800(register int RunCycles)
+{
+  register byte I;
+  register pair J;
+  register u8 **MM = MemoryMap;
+
+  for(CPU.ICount=RunCycles;;)
+  {
+    while(CPU.ICount>0)
+    {
+      /* Read opcode and count cycles */
+
+      I=MM[CPU.PC.W>>13][CPU.PC.W]; CPU.PC.W++;
+      CPU.ICount-=CyclesR800[I];
+
+      /* Interpret opcode */
+      switch(I)
+      {
+#define CYCLES_JR_NOT_TAKEN 1
+#define CYCLES_CALL_TAKEN 2
+#define CYCLES_RET_TAKEN 2
+#include "Codes.h"
+#undef CYCLES_JR_NOT_TAKEN
+#undef CYCLES_CALL_TAKEN
+#undef CYCLES_RET_TAKEN
+        case PFX_CB: CodesCB_R800();break;
+        case PFX_ED: CodesED_R800();break;
+        case PFX_FD: CodesFD_R800();break;
+        case PFX_DD: CodesDD_R800();break;
+      }
+    }
+
+    /* Unless we have come here after EI, exit */
+    if(!(CPU.IFF&IFF_EI)) return(CPU.ICount);
+    else
+    {
+      /* Done with AfterEI state */
+      CPU.IFF=(CPU.IFF&~IFF_EI)|IFF_1;
+      /* Restore the ICount */
+      CPU.ICount+=CPU.IBackup-1;
+      /* Interrupt CPU if needed */
+      if (CPU.IRequest!=INT_NONE) IntZ80(&CPU,CPU.IRequest);
+    }
+  }
+}
+
 #endif /* EXECZ80 */
 
 

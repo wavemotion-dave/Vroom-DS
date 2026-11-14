@@ -87,11 +87,13 @@ extern void RefreshLine6(u8 uY);
 extern void RefreshLine7(u8 uY);
 extern void RefreshLine8(u8 uY);
 extern void RefreshLine80(u8 uY);
+extern void RefereshPreviousLine(void);
 extern void ScanColorSprites(uint8_t Y);
 extern void vdp_9938_write_palette(u8 index, u8 color_grb);
 extern void WrCtrl9938(byte value);
 extern byte RdData9938(void);
 extern byte RdCtrl9938(void);
+extern void VDP9938WaitForR800Access(void);
 extern void Reset9938(void);
 extern void RebuildLutTablehh(void);
 extern void CheckNewMode(void);
@@ -131,6 +133,8 @@ static inline __attribute__((always_inline)) u8 *VDP9938Screen8DataPointer(void)
 /*************************************************************/
 static inline __attribute__((always_inline)) void WrData9938(byte V)  // This one is used frequently so we always inline it
 {
+    VDP9938WaitForR800Access();
+    
     if (unlikely(ScrMode == 8))
       VDPDlatch = *VDP9938Screen8DataPointer() = V;
     else

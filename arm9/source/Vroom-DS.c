@@ -2673,16 +2673,38 @@ int mid_frame_interrupt = 0;
 int H_BlankCycles = 54;
 u32 LoopZ80(void)
 {
+    static const u32 cpu_adjust[4] = {0, 29, 57, 228};
+    static const u32 hsync_adjust[4] = {0, 7, 14, 54};
+    
     // Execute 1 scanline worth of CPU instructions
     u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit; // Default to Z80 timing
     H_BlankCycles = 54;
 
-    // When we are in R800 mode, we boost the CPU cycles. This isn't true R800 / Turbo-R 
-    // emulation but it's close enough to get games running reasonably correctly. 
+    // -----------------------------------------------------------------------------------
+    // When we are in R800 mode, we boost the CPU clock and call the R800 CPU handler.
+    // We should be clocking at twice the normal Z80 frequency (3.58 MHz)- so this should 
+    // be running at 7.16 MHz but the poor DSi/XL/LL can't handle that so the best we can
+    // do is run the R800 at roughly 4 or 4.5 MHz give or take depending on configuration.
+    // It's far from perfect but a surprising number of games will run fine at that speed.
+    // -----------------------------------------------------------------------------------
     if (turbo_r_boost)
     {
-        cycles_to_process += 600 + (myConfig.cpuBoost * 114);
-        H_BlankCycles += 330 + (myConfig.cpuBoost * 33);
+        cycles_to_process += cpu_adjust[myConfig.cpuBoost];
+        H_BlankCycles += hsync_adjust[myConfig.cpuBoost];
+        
+        CPU.CycleDeficit = ExecR800(cycles_to_process);
+    }
+    else // Z80 handler
+    {
+        CPU.CycleDeficit = ExecZ80(cycles_to_process);
+    }
+
+    if (mid_frame_interrupt)
+    {
+        if (--mid_frame_interrupt == 0)
+        {
+            RefereshPreviousLine();
+        }
     }
 
     extern u16 turbo_timer;
@@ -2691,8 +2713,6 @@ u32 LoopZ80(void)
     extern u8 pcm_counter;
     pcm_counter++;
     
-    CPU.CycleDeficit = ExecZ80(cycles_to_process);
-
     // Run the FDC engine
     LoopFDC();
 
@@ -2707,6 +2727,10 @@ u32 LoopZ80(void)
     {
         IntZ80(&CPU, CPU.IRequest);
         CPU.NumInts++;                                                                   // Track Interrupt Requests
+        if (((CurLine - 1) >= VDP9938_START_LINE) && ((CurLine - 1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
+        {
+            mid_frame_interrupt = 3; // Let CPU run for 2 lines then redraw the previous 2...
+        }
     }
 
     // Drop out unless end of screen is reached
@@ -2724,7 +2748,7 @@ u32 LoopZ80(void)
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE 128
-#define MAX_DEBUG_BUF_SIZE (300 * 1024)
+#define MAX_DEBUG_BUF_SIZE (8 * 1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32 debug_len = 0;

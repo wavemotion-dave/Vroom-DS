@@ -1025,16 +1025,15 @@ void ApplyDatabaseTweaks(void)
     // ROM Games
     if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
     {
-        zone_terra_hack         = 300; // Roughly 5 seconds of holding the A button to bypass intro...
+        zone_terra_hack         = 600; // Roughly 10 seconds of holding the A button to bypass intro...
         myConfig.yOffset        = 9;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
+        myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.fdc_driver     = FDC_WD;
     }
 
     if (strstr(filename, "DARAIAYU"))
     {
-        myConfig.cpuBoost       = CPU_BOOST_MAX;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.fdc_driver     = FDC_TOSH;
     }
@@ -1043,16 +1042,17 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.scaleScreen    = 1;
         myConfig.yOffset        = 2;
+        myConfig.ymBalance      = YM_BAL_HIGH;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.frameSkip      = FS_LIGHT;
         myConfig.fdc_driver     = FDC_TOSH;
         myConfig.pcm            = 1;
+        myConfig.fakeFMPAC      = 1;
     }
 
     if (strstr(filename, "KARATE") && strstr(filename, "CHAMP"))
     {
         myConfig.yOffset        = 17;
-        myConfig.cpuBoost       = CPU_BOOST_MED;
         myConfig.frameSkip      = FS_LIGHT;
         myConfig.fdc_driver     = FDC_TOSH;
     }
@@ -1060,7 +1060,6 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "KITTEN") && strstr(filename, "RETURN"))
     {
         myConfig.yOffset        = 20;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_LIGHT;
         myConfig.fdc_driver     = FDC_TOSH;
     }
@@ -1072,15 +1071,13 @@ void ApplyDatabaseTweaks(void)
 
     if (strstr(filename, "SUPER") && strstr(filename, "WONDER"))
     {
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_LIGHT;
         myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.frameSkip      = FS_LIGHT;
     }
 
     if (strstr(filename, "NEON") && strstr(filename, "REVENANT"))
     {
         myConfig.yOffset        = 18;
-        myConfig.cpuBoost       = CPU_BOOST_MAX;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.fdc_driver     = FDC_TOSH;
     }
@@ -1088,15 +1085,13 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "XENON") && strstr(filename, "MEGABLAST"))
     {
         myConfig.msxMapper      = SCC8;
-        myConfig.cpuBoost       = CPU_BOOST_MAX;
-        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.frameSkip      = FS_LIGHT;
         myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "YOOMP"))
     {
         myConfig.msxMapper      = ASC16;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.fdc_driver     = FDC_TOSH;
     }
@@ -1116,7 +1111,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "TREASURE") && strstr(filename, "BABYLON"))
     {
         myConfig.yOffset        = 18;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.fdc_driver     = FDC_TOSH;
     }
@@ -1132,8 +1127,7 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 7;
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
     }
 
     if (strstr(filename, "ANGRY") && strstr(filename, "BOT"))
@@ -1145,8 +1139,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "APPETITE") && strstr(filename, "COMPLETE"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
         MapCursors();
     }
 
@@ -1154,7 +1147,6 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 20;
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.dpad           = DPAD_MOUSE;
     }
@@ -1162,7 +1154,6 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "CLOPPY"))
     {
         myConfig.fdc_driver     = FDC_TOSH;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
     }
 
@@ -1170,17 +1161,16 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 7;
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
         MapCursors();
     }
     
     if (strstr(filename, "DEWOMAN"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
         myConfig.MIDI           = 0xFF;
+        MapCursors();
     }
     
     if (strstr(filename, "F-NANO"))
@@ -1194,7 +1184,6 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 10;
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
     }
     
@@ -1202,20 +1191,21 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 17;
         myConfig.fdc_driver     = FDC_WD;
+        MapCursors();
     }
 
     if (strstr(filename, "FRAY") && strstr(filename, "MAGICAL"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
+        myConfig.cpuBoost       = CPU_BOOST_SLOW;
+        myConfig.fakeFMPAC      = 1;
         myConfig.pcm            = 1;
     }
 
     if (strstr(filename, "GUN") && strstr(filename, "SHOT"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.dpad           = DPAD_MOUSE;
     }
@@ -1223,7 +1213,6 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "KATO") && strstr(filename, "MINIGAME"))
     {
         myConfig.fdc_driver     = FDC_TOSH;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.pcm            = 1;
     }
@@ -1239,12 +1228,13 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 12;
         myConfig.fdc_driver     = FDC_WD;
+        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.cpuBoost       = CPU_BOOST_SLOW;
     }
 
     if (strstr(filename, "MECHANICAL") && strstr(filename, "BRAIN"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
     }
 
@@ -1252,14 +1242,13 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 2;
         myConfig.fdc_driver     = FDC_TOSH;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
     }
 
     if (strstr(filename, "MOON") && strstr(filename, "SAGA"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_MED;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
     }
 
@@ -1272,7 +1261,6 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "MYU") && strstr(filename, "SIOS"))
     {
         myConfig.fdc_driver     = FDC_TOSH;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.dpad           = DPAD_MOUSE;
         myConfig.pcm            = 1;
     }
@@ -1280,23 +1268,21 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "PARA") && strstr(filename, "DREAM"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_MAX;
+        myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.frameSkip      = FS_HEAVY;
     }
     
     if (strstr(filename, "RANMA") && strstr(filename, "NIBUNNOICHI"))
     {
         myConfig.fdc_driver     = FDC_TOSH;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.frameSkip      = FS_HEAVY;
-        myConfig.dpad           = DPAD_MOUSE;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
         myConfig.pcm            = 1;
+        MapCursors();
     }
 
     if (strstr(filename, "SEED") && strstr(filename, "DRAGON"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.pcm            = 1;
     }
@@ -1315,13 +1301,11 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "STAGE") && strstr(filename, "11"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
     }
 
     if (strstr(filename, "S.T.G."))
     {
         myConfig.fdc_driver     = FDC_TOSH;
-        myConfig.cpuBoost       = CPU_BOOST_MAX;
         myConfig.frameSkip      = FS_NONE;
         MapCursors();
     }
@@ -1330,13 +1314,13 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 2;
         myConfig.fdc_driver     = FDC_WD;
+        myConfig.frameSkip      = FS_LIGHT; // Needs blending
     }
     
     if (strstr(filename, "HAMARAJA") && strstr(filename, "NIGHT"))
     {
         myConfig.yOffset        = 15;
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.pcm            = 1;
     }
     
@@ -1374,15 +1358,15 @@ void SetDefaultGameConfig(void)
     myConfig.maxSprites = 0;                    // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
     myConfig.dpad = DPAD_NORMAL;                // Normal DPAD use - mapped to joystick
     myConfig.yOffset = 0;                       // Default is no Y offset
-    myConfig.cpuBoost = 1;                      // Run CPU at 'Medium' boost for R800
+    myConfig.cpuBoost = CPU_BOOST_MED;          // Run CPU at 'Medium' boost for R800
     myConfig.fdc_driver = 0;                    // 0=WD2793, 1=Toshiba
     myConfig.scaleScreen = 0;                   // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.frameSkip = 1;                     // Light frameskip by default... some games will need heavy
-    myConfig.ymScale = YM_BAL_MED;              // Normal YM is scaled mid-level
+    myConfig.ymBalance = YM_BAL_MED;            // Normal YM is scaled mid-level
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
     myConfig.MIDI = 0x05;
     myConfig.pcm = 0;
-    myConfig.reserved0 = 0;
+    myConfig.fakeFMPAC = 0;
     myConfig.reserved1 = 0;
     myConfig.reserved2 = 0;
     myConfig.reserved3 = 0;
@@ -1475,13 +1459,13 @@ const struct options_t Option_Table[1][20] =
     // Page 1 - Game Options
     {
         {"MSX MAPPER",      {"GUESS", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "ASCII 16X", "NEO8", "NEO16"},                                                &myConfig.msxMapper,         7},
-        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "MAX", "LUDICRIST"},                                                                                             &myConfig.cpuBoost,          5},
+        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "TRUE"},                                                                                                         &myConfig.cpuBoost,          4},
         {"FRAMESKIP",       {"NONE", "LIGHT", "HEAVY"},                                                                                                                 &myConfig.frameSkip,         3},
         {"DPAD",            {"NORMAL", "DIAGONALS", "MOUSE", "SLIDE-N-GLIDE"},                                                                                          &myConfig.dpad,              4},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
         {"FDC DRIVER",      {"WD2973", "TC8566AF"},                                                                                                                     &myConfig.fdc_driver,        2},
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},
-        {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
+        {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymBalance,         4},
         {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},
         {"PCM",             {"DISABLED", "ENABLED"},                                                                                                                    &myConfig.pcm,               2},
         {"DISK SOUND",      {"OFF", "ON"},                                                                                                                              &myGlobalConfig.bDiskSounds, 2},        

@@ -21,7 +21,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 512
-#define CONFIG_VER                  0x0003
+#define CONFIG_VER                  0x0004
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -76,11 +76,11 @@ struct __attribute__((__packed__)) Config_t
     u8  fdc_driver;
     u8  scaleScreen;
     u8  frameSkip;
-    u8  ymScale;
+    u8  ymBalance;
     u8  overscan;
     u8  MIDI;
     u8  pcm;
-    u8  reserved0;
+    u8  fakeFMPAC;
     u8  reserved1;
     u8  reserved2;
     u8  reserved3;
@@ -106,7 +106,6 @@ extern s32 pcm_sample_filtered;
 #define CPU_BOOST_SLOW              0       // A bit slower than normal
 #define CPU_BOOST_MED               1       // Roughly normal
 #define CPU_BOOST_FAST              2       // A bit faster than normal
-#define CPU_BOOST_MAX               3       // She can't take much more, Capt'n!
 
 #define FDC_WD                      0       // Older WD2793 driver
 #define FDC_TOSH                    1       // MSX Turbo-R Toshiba Driver

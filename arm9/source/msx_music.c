@@ -844,7 +844,7 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
     // sustain-level table and percussive decay were made more accurate.
     // Equivalent to (>>14) then << (ymScale+2). If dense chords crackle at high
     // ymScale, check the final mix for overflow or go back to (>>13).
-    return carrier >> (12 - myConfig.ymScale);
+    return carrier >> (12 - myConfig.ymBalance);
 }
 
 // -------------------------------------------------------------------------

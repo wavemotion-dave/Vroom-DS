@@ -21,11 +21,25 @@
 
 #define DEBUG_REFRESH(x) //debug[x]++;
 
-#define TURBO_R_WAIT_FACTOR    40
+#define R800_VDP_ACCESS_WAIT 20
 
 volatile u8 bufferZone1[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
 u8 XBuf[2][256*224] ALIGN(32) = {0};    // V9938/V9958 screen is 256x224 (for overscan). We double-buffer the output.
 volatile u8 bufferZone2[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
+
+u32 __attribute__((section(".dtcm"))) last_vdp_access = 999;
+inline __attribute__((always_inline)) void VDP9938WaitForR800Access(void)
+{
+  if (turbo_r_boost)
+  {
+      u32 access_delta = (last_vdp_access - CPU.ICount);
+      if (access_delta < 50)
+      {
+        CPU.ICount -= (50-access_delta);
+      }
+      last_vdp_access = CPU.ICount;
+  }
+}
 
 u8 XPal[256]                __attribute__((aligned(4), section(".dtcm"))) = {0};
 u8 XPalReal0                __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
@@ -150,6 +164,8 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
 // -------------------------------------------------------------------------------------------------
 void write_port_palette(uint8_t data)
 {
+    VDP9938WaitForR800Access();
+    
     if (!palette_latch)
     {
         // First Byte: Red (bits 6-4) and Blue (bits 2-0)
@@ -3139,10 +3155,7 @@ void CheckNewMode(void)
 
 ITCM_CODE void Write9938(u8 iReg, u8 value)
 {
-  if (turbo_r_boost)
-  {
-      CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
-  }
+  VDP9938WaitForR800Access();
   
   /* There are VDP registers - map down to these and mask off irrelevant bits */
   iReg &= 0x3f;
@@ -3200,10 +3213,7 @@ ITCM_CODE byte RdData9938(void)
 {
   byte data = VDPDlatch;
   
-  if (turbo_r_boost)
-  {
-      CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
-  }
+  VDP9938WaitForR800Access();
 
   VDPDlatch = (ScrMode == 8)  ? *VDP9938Screen8DataPointer() : VPAGE[VAddr];
   VAddr = (VAddr+1)&0x3FFF;
@@ -3251,11 +3261,7 @@ ITCM_CODE void IndirectRegWrite9938(u8 Value)
 /*************************************************************/
 ITCM_CODE void WrCtrl9938(byte value)
 {
-    if (turbo_r_boost)
-    {
-        CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
-    }
-
+  VDP9938WaitForR800Access();
   if(VDPCtrlLatch)  // Write the high byte of the video address
   {
     VDPCtrlLatch=0; // Set the VDP flip-flop so we do the low byte next
@@ -3297,13 +3303,10 @@ ITCM_CODE void WrCtrl9938(byte value)
 /****************************************************************/
 ITCM_CODE byte RdCtrl9938(void)
 {
-  if (turbo_r_boost)
-  {
-      CPU.ICount-=((myConfig.cpuBoost+1) * TURBO_R_WAIT_FACTOR);
-  }
-
   byte data = VDPStatus[VDP[15]];
   VDPCtrlLatch = 0;
+  
+  VDP9938WaitForR800Access();
   
   if (VDP[15] == 0) // Status register 0
   {
@@ -3355,6 +3358,12 @@ ITCM_CODE byte RdCtrl9938(void)
   return(data);
 }
 
+// A bit of a hack for split screen scrolling games
+void RefereshPreviousLine(void)
+{
+    int refresh_line = CurLine-1;
+    if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
+}
 
 /** Loop9938() ***********************************************/
 /** Call this routine on every scanline to update the       **/

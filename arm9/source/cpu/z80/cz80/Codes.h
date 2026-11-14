@@ -25,10 +25,10 @@
 // For the jump instructions, the Cycle[] table builds in assuming the jump WILL be taken
 // which is true about 95% of the time. If the jump is not taken, we compensate ICount.
 // ----------------------------------------------------------------------------------------
-case JR_NZ:   if(CPU.AF.B.l&Z_FLAG) {CPU.ICount+=5; CPU.PC.W++;} else { M_JR; } break;
-case JR_NC:   if(CPU.AF.B.l&C_FLAG) {CPU.ICount+=5; CPU.PC.W++;} else { M_JR; } break;
-case JR_Z:    if(CPU.AF.B.l&Z_FLAG) { M_JR; } else {CPU.ICount+=5; CPU.PC.W++;} break;
-case JR_C:    if(CPU.AF.B.l&C_FLAG) { M_JR; } else {CPU.ICount+=5; CPU.PC.W++;} break;
+case JR_NZ:   if(CPU.AF.B.l&Z_FLAG) {CPU.ICount+=CYCLES_JR_NOT_TAKEN; CPU.PC.W++;} else { M_JR; } break;
+case JR_NC:   if(CPU.AF.B.l&C_FLAG) {CPU.ICount+=CYCLES_JR_NOT_TAKEN; CPU.PC.W++;} else { M_JR; } break;
+case JR_Z:    if(CPU.AF.B.l&Z_FLAG) { M_JR; } else {CPU.ICount+=CYCLES_JR_NOT_TAKEN; CPU.PC.W++;} break;
+case JR_C:    if(CPU.AF.B.l&C_FLAG) { M_JR; } else {CPU.ICount+=CYCLES_JR_NOT_TAKEN; CPU.PC.W++;} break;
 
 case JP_NZ:   if(CPU.AF.B.l&Z_FLAG) CPU.PC.W+=2; else { M_JP; } break;
 case JP_NC:   if(CPU.AF.B.l&C_FLAG) CPU.PC.W+=2; else { M_JP; } break;
@@ -39,23 +39,23 @@ case JP_C:    if(CPU.AF.B.l&C_FLAG) { M_JP; } else CPU.PC.W+=2; break;
 case JP_PE:   if(CPU.AF.B.l&P_FLAG) { M_JP; } else CPU.PC.W+=2; break;
 case JP_M:    if(CPU.AF.B.l&S_FLAG) { M_JP; } else CPU.PC.W+=2; break;
 
-case RET_NZ:  if(!(CPU.AF.B.l&Z_FLAG)) { CPU.ICount-=6;M_RET; } break;
-case RET_NC:  if(!(CPU.AF.B.l&C_FLAG)) { CPU.ICount-=6;M_RET; } break;
-case RET_PO:  if(!(CPU.AF.B.l&P_FLAG)) { CPU.ICount-=6;M_RET; } break;
-case RET_P:   if(!(CPU.AF.B.l&S_FLAG)) { CPU.ICount-=6;M_RET; } break;
-case RET_Z:   if(CPU.AF.B.l&Z_FLAG)    { CPU.ICount-=6;M_RET; } break;
-case RET_C:   if(CPU.AF.B.l&C_FLAG)    { CPU.ICount-=6;M_RET; } break;
-case RET_PE:  if(CPU.AF.B.l&P_FLAG)    { CPU.ICount-=6;M_RET; } break;
-case RET_M:   if(CPU.AF.B.l&S_FLAG)    { CPU.ICount-=6;M_RET; } break;
+case RET_NZ:  if(!(CPU.AF.B.l&Z_FLAG)) { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
+case RET_NC:  if(!(CPU.AF.B.l&C_FLAG)) { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
+case RET_PO:  if(!(CPU.AF.B.l&P_FLAG)) { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
+case RET_P:   if(!(CPU.AF.B.l&S_FLAG)) { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
+case RET_Z:   if(CPU.AF.B.l&Z_FLAG)    { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
+case RET_C:   if(CPU.AF.B.l&C_FLAG)    { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
+case RET_PE:  if(CPU.AF.B.l&P_FLAG)    { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
+case RET_M:   if(CPU.AF.B.l&S_FLAG)    { CPU.ICount-=CYCLES_RET_TAKEN;M_RET; } break;
 
-case CALL_NZ: if(CPU.AF.B.l&Z_FLAG) CPU.PC.W+=2; else { CPU.ICount-=7;M_CALL; } break;
-case CALL_NC: if(CPU.AF.B.l&C_FLAG) CPU.PC.W+=2; else { CPU.ICount-=7;M_CALL; } break;
-case CALL_PO: if(CPU.AF.B.l&P_FLAG) CPU.PC.W+=2; else { CPU.ICount-=7;M_CALL; } break;
-case CALL_P:  if(CPU.AF.B.l&S_FLAG) CPU.PC.W+=2; else { CPU.ICount-=7;M_CALL; } break;
-case CALL_Z:  if(CPU.AF.B.l&Z_FLAG) { CPU.ICount-=7;M_CALL; } else CPU.PC.W+=2; break;
-case CALL_C:  if(CPU.AF.B.l&C_FLAG) { CPU.ICount-=7;M_CALL; } else CPU.PC.W+=2; break;
-case CALL_PE: if(CPU.AF.B.l&P_FLAG) { CPU.ICount-=7;M_CALL; } else CPU.PC.W+=2; break;
-case CALL_M:  if(CPU.AF.B.l&S_FLAG) { CPU.ICount-=7;M_CALL; } else CPU.PC.W+=2; break;
+case CALL_NZ: if(CPU.AF.B.l&Z_FLAG) CPU.PC.W+=2; else { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } break;
+case CALL_NC: if(CPU.AF.B.l&C_FLAG) CPU.PC.W+=2; else { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } break;
+case CALL_PO: if(CPU.AF.B.l&P_FLAG) CPU.PC.W+=2; else { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } break;
+case CALL_P:  if(CPU.AF.B.l&S_FLAG) CPU.PC.W+=2; else { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } break;
+case CALL_Z:  if(CPU.AF.B.l&Z_FLAG) { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } else CPU.PC.W+=2; break;
+case CALL_C:  if(CPU.AF.B.l&C_FLAG) { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } else CPU.PC.W+=2; break;
+case CALL_PE: if(CPU.AF.B.l&P_FLAG) { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } else CPU.PC.W+=2; break;
+case CALL_M:  if(CPU.AF.B.l&S_FLAG) { CPU.ICount-=CYCLES_CALL_TAKEN;M_CALL; } else CPU.PC.W+=2; break;
 
 case ADD_B:    M_ADD(CPU.BC.B.h);break;
 case ADD_C:    M_ADD(CPU.BC.B.l);break;
@@ -220,7 +220,7 @@ case POP_DE:   M_POP(DE);break;
 case POP_HL:   M_POP(HL);break;
 case POP_AF:   M_POP(AF);break;
 
-case DJNZ: if(--CPU.BC.B.h) { M_JR; } else {CPU.ICount+=5; CPU.PC.W++;} break;
+case DJNZ: if(--CPU.BC.B.h) { M_JR; } else {CPU.ICount+=CYCLES_JR_NOT_TAKEN; CPU.PC.W++;} break;
 case JP:   M_JP;break;
 case JR:   M_JR;break;
 case CALL: M_CALL;break;

@@ -1,5 +1,5 @@
 /******************************************************************************
-*  Hachibitto Z80 CPU 
+*  Vroom-DS Z80 CPU 
 *
 * Note: Most of this file is from the ColEm emulator core by Marat Fayzullin
 *       but heavily modified for specific NDS use. If you want to use this
@@ -118,6 +118,8 @@ static const byte CyclesXX[256] __attribute__((section(".dtcm"))) =
    0, 14,  0, 23,  0, 15,   0,  0,        0,  8,  0,  0, 0,  0,  0,  0,   // 0xE0
    0,  0,  0,  0,  0,  0,   0,  0,        0, 10,  0,  0, 0,  0,  0,  0    // 0xF0
 };
+
+#include "R800Tables.h"
 
 static const byte ZSTable[256] __attribute__((section(".dtcm"))) =
 {

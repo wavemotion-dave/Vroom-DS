@@ -47,7 +47,7 @@
 //      curve, so YM_RATE_BASE is tuned by ear to compensate. Attack is a
 //      simpler approximation and is not hardware-accurate.
 //    - Carrier envelope and channel volume are applied in a single multiply
-//      and one shift, with the YM output level (ymScale) folded into that
+//      and one shift, with the YM output level (ymBalance) folded into that
 //      shift. This avoids intermediate truncation, which turned fading notes
 //      into coarse, grating stair-steps.
 //    - Melodic FM is rendered at half the output sample rate, with oscillator

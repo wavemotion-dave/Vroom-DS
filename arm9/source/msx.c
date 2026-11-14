@@ -58,12 +58,12 @@ s32 pcm_sample_filtered __attribute__((section(".dtcm"))) = 0;
 u8 s1990_skip_leftover = 0;
 
 // Provides the "PAC OPPL" string needed for some games to detect SRAM
-u8 FAKE_FMPAC[0x2000] = {
+u8 FAKE_FMPAC[0x2000];
+
+u8 FAKE_FMPAC_SIG[] = {
     0x00, 0x00, 0x00, 0x00, 0x82, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x41, 0x43, 0x32, 0x4F, 0x50, 0x4C, 0x4C,
 };
-
-u32 KanjiAdr[2]         = {0,0};     // [0]=level 1, [1]=level 2 (17-bit byte offset)
 
 // --------------------------------------------------------------------------
 // These aren't used very often so we don't need them in fast .dtcm memory
@@ -504,34 +504,63 @@ __attribute__((noinline)) u8 ReadJoystick(void)
     return joy1;
 }
 
-__attribute__((noinline)) uint8_t ReadPort_KanjiDriver(uint8_t port)
+
+static u16 KanjiAdr = 0;       // Shared 12-bit character address
+static u8  KanjiCounter = 0;   // Byte within 32-byte glyph
+static u8  KanjiLevel = 0;     // Selected level: 0 or 1
+
+__attribute__((noinline))
+uint8_t ReadPort_KanjiDriver(uint8_t port)
 {
-    switch (port)
+    if (port == 0xD9 || port == 0xDB)
     {
-        case 0xD9:
-        case 0xDB:
-        {
-            int lvl = (port == 0xDB);
-            u32 a = KanjiAdr[lvl];
-            uint8_t data = KANJI_FONT[(lvl ? 0x20000 : 0) + a];
-            // increment only the low 5 bits (within the 32-byte glyph), no carry
-            KanjiAdr[lvl] = (a & ~0x1Fu) | ((a + 1) & 0x1F);
-            return data;
-        }
+        u32 offset = ((u32)KanjiLevel << 17)
+                   + ((u32)KanjiAdr << 5)
+                   + KanjiCounter;
+
+        uint8_t data = KANJI_FONT[offset];
+
+        KanjiCounter = (KanjiCounter + 1) & 0x1F;
+
+        return data;
     }
+
     return 0xFF;
 }
 
-__attribute__((noinline)) void WritePort_KanjiDriver(uint8_t port, uint8_t value)
+__attribute__((noinline))
+void WritePort_KanjiDriver(uint8_t port, uint8_t value)
 {
     switch (port)
     {
-        case 0xD8: KanjiAdr[0] = (KanjiAdr[0] & 0x1F800) | ((value & 0x3F) << 5);  break;
-        case 0xD9: KanjiAdr[0] = (KanjiAdr[0] & 0x007E0) | ((value & 0x3F) << 11); break;
-        case 0xDA: KanjiAdr[1] = (KanjiAdr[1] & 0x1F800) | ((value & 0x3F) << 5);  break;
-        case 0xDB: KanjiAdr[1] = (KanjiAdr[1] & 0x007E0) | ((value & 0x3F) << 11); break;
+        case 0xD8:
+        case 0xD9:
+        case 0xDA:
+        case 0xDB:
+        {
+            // Select Kanji level when writing either address port.
+            KanjiLevel = (port & 2) ? 1 : 0;
+
+            if (port & 1)
+            {
+                // Upper six bits of character address.
+                KanjiAdr = (KanjiAdr & 0x03F)
+                         | ((u16)(value & 0x3F) << 6);
+            }
+            else
+            {
+                // Lower six bits of character address.
+                KanjiAdr = (KanjiAdr & 0xFC0)
+                         | (value & 0x3F);
+            }
+
+            // Every address write resets the byte counter.
+            KanjiCounter = 0;
+            break;
+        }
     }
 }
+
 
 typedef struct {
     s32 pendX, pendY;   // host motion not yet delivered to the game
@@ -1024,7 +1053,6 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     }
     else if (Port == 0xA4) // PCM
     {
-        debug[4]++;
         pcm_last_a4 = Value;
         pcm_counter = 0x00;
 
@@ -1037,7 +1065,6 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     }
     else if (Port == 0xA5) // PCM
     {
-        debug[5]++;
         pcm_last_a5 = Value;
     }
     else if (Port == 0xA8) // Slot system for MSX
@@ -1502,7 +1529,15 @@ void MSX_InitialMemoryLayout(void)
     MyMedia[MEDIA_CART2].mapperMask = 0x01;
     MyMedia[MEDIA_CART2].blockSize = 0x2000;
     MyMedia[MEDIA_CART2].mapperType = PAC_SRAM;
-    memset(FAKE_FMPAC+0x20, 0xFF, sizeof(FAKE_FMPAC)-0x20);
+    
+    memset(FAKE_FMPAC, 0xFF, sizeof(FAKE_FMPAC));
+
+    // If we have been asked to fake the FM-PAC signature, do so... some
+    // games like Illusion City require the PAC-OPPL signature to be present.
+    if (myConfig.fakeFMPAC)
+    {
+        memcpy(FAKE_FMPAC, FAKE_FMPAC_SIG, sizeof(FAKE_FMPAC_SIG));
+    }
 
     MSXCartPtr[MEDIA_CART2][0] = (u8*)Unmapped_Memory;           // Segment Unmapped
     MSXCartPtr[MEDIA_CART2][1] = (u8*)Unmapped_Memory;           // Segment Unmapped
@@ -1597,8 +1632,9 @@ void msx_reset(void)
     turbo_timer = 0;
     msx_dos22 = 0;
     dos22_bank = 0;
-    
-    memset(KanjiAdr, 0x00, sizeof(KanjiAdr));
+    KanjiAdr = 0;
+    KanjiCounter = 0;
+    KanjiLevel = 0;
     
     mirror_ram_bank[0] = 3;
     mirror_ram_bank[1] = 2;
