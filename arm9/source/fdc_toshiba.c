@@ -29,6 +29,9 @@
 #define TC_ST3_TRACK0       0x10
 #define TC_ST3_READY        0x20
 
+static u8 fdc_toshiba_disk_changed[2] = {0,0};
+
+
 // This models the TC8566AF command/FIFO interface using sector-addressable DSK
 // images. Unlike openMSX's raw-track model, it does not emulate rotation, CRCs,
 // deleted-data marks, or byte-by-byte DRQ timing.
@@ -221,23 +224,42 @@ static void fdc_toshiba_begin_data_transfer(u8 write)
 {
     u8 *sector;
     u8 unit_head = ToshibaFDC.tc_parameters[0];
+    u8 requested_cylinder = ToshibaFDC.tc_parameters[1];
+    u8 requested_head = ToshibaFDC.tc_parameters[2] & 1;
+    u8 requested_size_code = ToshibaFDC.tc_parameters[4];
+    u32 requested_size = requested_size_code <= 7 ? (128U << requested_size_code) : 0;
 
     ToshibaFDC.drive = unit_head & 3;
     fdc_toshiba_transfer_physical_head = (unit_head >> 2) & 1;
     ToshibaFDC.side = fdc_toshiba_transfer_physical_head;
-    ToshibaFDC.tc_transfer_cylinder = ToshibaFDC.tc_parameters[1];
-    ToshibaFDC.tc_transfer_head = ToshibaFDC.tc_parameters[2] & 1;
+    ToshibaFDC.tc_transfer_cylinder = requested_cylinder;
+    ToshibaFDC.tc_transfer_head = requested_head;
     ToshibaFDC.tc_transfer_sector = ToshibaFDC.tc_parameters[3];
     ToshibaFDC.tc_transfer_eot = ToshibaFDC.tc_parameters[5];
     fdc_toshiba_next_sector_missing = 0;
 
-    ToshibaFDC.track = ToshibaFDC.tc_transfer_cylinder;
+    // C/H in the sector ID must describe the cylinder/head actually selected.
+    // The controller's present-cylinder register is updated by SEEK/RECALIBRATE;
+    // a data command must not teleport the head by supplying a different C value.
+    ToshibaFDC.track = (ToshibaFDC.drive < 2)
+                           ? ToshibaFDC.tc_current_track[ToshibaFDC.drive]
+                           : 0xFF;
     ToshibaFDC.sector = ToshibaFDC.tc_transfer_sector;
     ToshibaFDC.tc_status0 = fdc_toshiba_status0(0);
     ToshibaFDC.tc_status1 = 0;
     ToshibaFDC.tc_status2 = 0;
 
-    sector = fdc_toshiba_sector_ptr(ToshibaFDC.drive, ToshibaFDC.track, ToshibaFDC.side, ToshibaFDC.sector);
+    sector = NULL;
+    if (ToshibaFDC.drive < 2 &&
+        requested_cylinder == ToshibaFDC.track &&
+        requested_head == fdc_toshiba_transfer_physical_head &&
+        requested_size == ToshibaGeom.sectorSize &&
+        requested_size != 0)
+    {
+        sector = fdc_toshiba_sector_ptr(ToshibaFDC.drive, ToshibaFDC.track,
+                                        ToshibaFDC.side, ToshibaFDC.sector);
+    }
+
     if (!sector || !ToshibaGeom.sectorSize ||
         ToshibaFDC.tc_transfer_eot < ToshibaFDC.tc_transfer_sector ||
         fdc_toshiba_track_size() > sizeof(ToshibaFDC.track_buffer))
@@ -418,7 +440,8 @@ static void fdc_toshiba_execute_command(void)
             if (drive < ToshibaGeom.drives && fdc_toshiba_disk_ptr(drive))
             {
                 if (ToshibaGeom.sides > 1) status |= 0x08;
-                if (ToshibaFDC.tc_current_track[drive] == 0) status |= TC_ST3_TRACK0;
+                if (drive < 2 && ToshibaFDC.tc_current_track[drive] == 0)
+                    status |= TC_ST3_TRACK0;
                 status |= TC_ST3_READY;
             }
             u8 result = status;
@@ -439,6 +462,7 @@ static void fdc_toshiba_execute_command(void)
             u8 drive = ToshibaFDC.tc_parameters[0] & 3;
             u8 current_track = drive < 2 ? ToshibaFDC.tc_current_track[drive] : 0;
             u8 target_track = operation == 0x07 ? 0 : ToshibaFDC.tc_parameters[1];
+            if (drive < 2) fdc_toshiba_disk_changed[drive] = 0;
             ToshibaFDC.drive = drive;
             ToshibaFDC.side = (ToshibaFDC.tc_parameters[0] >> 2) & 1;
             fdc_toshiba_seek_drive = drive;
@@ -483,9 +507,9 @@ static void fdc_toshiba_execute_command(void)
             }
             else
             {
-                // SENSE INTERRUPT STATUS still returns ST0 and the current
-                // cylinder when there is no pending seek completion.
-                result[0] = 0;
+                // No seek/recalibrate completion is pending: report invalid
+                // interrupt status (ST0 bit 7), as a 765-compatible FDC does.
+                result[0] = TC_ST0_INVALID;
                 result[1] = ToshibaFDC.drive < 2
                                 ? ToshibaFDC.tc_current_track[ToshibaFDC.drive]
                                 : 0;
@@ -655,7 +679,13 @@ u8 fdc_toshiba_read(u8 addr)
     switch (addr)
     {
         case 0: return ToshibaFDC.tc_rom_bank;
-        case 1: return 0x03;    // No disk-change flags are modeled
+        case 1:
+        {
+            u8 v = 0x33;
+            if (fdc_toshiba_disk_changed[0]) v &= ~0x10;
+            if (fdc_toshiba_disk_changed[1]) v &= ~0x20;
+            return v;
+        }
         case 4:
         {
             fdc_toshiba_finish_missing_sector();
@@ -669,6 +699,37 @@ u8 fdc_toshiba_read(u8 addr)
     }
 }
 
+// Reset the TC8566AF command engine without disturbing mounted disks,
+// buffered disk contents, ROM banking, or the selected drive.
+static void fdc_toshiba_controller_reset(void)
+{
+    ToshibaFDC.command = 0;
+    ToshibaFDC.commandType = 0;
+    ToshibaFDC.tc_phase = TC_PHASE_IDLE;
+    ToshibaFDC.tc_command_count = 0;
+    ToshibaFDC.tc_command_index = 0;
+    ToshibaFDC.tc_result_count = 0;
+    ToshibaFDC.tc_result_index = 0;
+    ToshibaFDC.tc_pending_interrupt = 0;
+    ToshibaFDC.tc_pending_st0 = 0;
+    ToshibaFDC.tc_pending_track = 0;
+    ToshibaFDC.tc_ndma = 1;
+    ToshibaFDC.tc_rqm_delay = 0;
+    ToshibaFDC.int_req = 0;
+    ToshibaFDC.busy_countdown = 0;
+    ToshibaFDC.wait_for_read = 2;
+    ToshibaFDC.wait_for_write = 2;
+    ToshibaFDC.read_timeout = 0;
+    fdc_toshiba_seek_in_progress = 0;
+    fdc_toshiba_seek_drive = 0;
+    fdc_toshiba_seek_target = 0;
+    fdc_toshiba_transfer_physical_head = 0;
+    fdc_toshiba_next_sector_missing = 0;
+    ToshibaFDC.status = 0x80;
+    memset(fdc_toshiba_disk_changed, 0x00, sizeof(fdc_toshiba_disk_changed));
+    fdc_toshiba_main_status();
+}
+
 void fdc_toshiba_write(u8 addr, u8 data)
 {
     switch (addr)
@@ -677,12 +738,21 @@ void fdc_toshiba_write(u8 addr, u8 data)
             ToshibaFDC.tc_rom_bank = data & 0x03;
             break;
 
-        case 2: // Digital output register
+        case 2: // Control Register 0 (drive select, reset, ENID, motors)
+        {
             ToshibaFDC.tc_dor = data;
-            ToshibaFDC.motor = (data >> 4) & 3;
+            ToshibaFDC.motor = (data >> 4) & 0x0F;
             fdc_toshiba_setDrive(data & 3);
-            fdc_toshiba_main_status();
+
+            // -FRST is active low. Reset the command engine while asserted;
+            // ENID is retained but external interrupt/DMA pins are not wired
+            // into the MSX polling interface modeled by this emulator.
+            if (!(data & 0x04))
+                fdc_toshiba_controller_reset();
+            else
+                fdc_toshiba_main_status();
             break;
+        }
 
         case 3: // Controller configuration register
             ToshibaFDC.tc_cr1 = data;
@@ -705,7 +775,8 @@ void fdc_toshiba_write(u8 addr, u8 data)
             break;
 
         case 5: // Command/result/data FIFO
-            fdc_toshiba_write_fifo(data);
+            if (ToshibaFDC.tc_dor & 0x04)
+                fdc_toshiba_write_fifo(data);
             break;
 
         default:

@@ -1024,6 +1024,7 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     }
     else if (Port == 0xA4) // PCM
     {
+        debug[4]++;
         pcm_last_a4 = Value;
         pcm_counter = 0x00;
 
@@ -1036,6 +1037,7 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     }
     else if (Port == 0xA5) // PCM
     {
+        debug[5]++;
         pcm_last_a5 = Value;
     }
     else if (Port == 0xA8) // Slot system for MSX

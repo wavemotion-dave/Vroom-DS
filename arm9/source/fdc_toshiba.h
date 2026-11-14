@@ -28,7 +28,7 @@ struct ToshibaFDC_t
     u8  data;
     u8  drive;
     u8  side;
-    u8  motor;
+    u8  motor;                 // Four-bit TC8566AF motor-enable mask (CR0 D7-D4)
     u8  wait_for_read;
     u8  wait_for_write;
     u8  commandType;
