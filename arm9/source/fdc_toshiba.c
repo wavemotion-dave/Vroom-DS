@@ -462,6 +462,7 @@ static void fdc_toshiba_execute_command(void)
             u8 drive = ToshibaFDC.tc_parameters[0] & 3;
             u8 current_track = drive < 2 ? ToshibaFDC.tc_current_track[drive] : 0;
             u8 target_track = operation == 0x07 ? 0 : ToshibaFDC.tc_parameters[1];
+            // A seek/recalibrate acknowledges the drive's latched change line.
             if (drive < 2) fdc_toshiba_disk_changed[drive] = 0;
             ToshibaFDC.drive = drive;
             ToshibaFDC.side = (ToshibaFDC.tc_parameters[0] >> 2) & 1;
@@ -726,7 +727,6 @@ static void fdc_toshiba_controller_reset(void)
     fdc_toshiba_transfer_physical_head = 0;
     fdc_toshiba_next_sector_missing = 0;
     ToshibaFDC.status = 0x80;
-    memset(fdc_toshiba_disk_changed, 0x00, sizeof(fdc_toshiba_disk_changed));
     fdc_toshiba_main_status();
 }
 
@@ -792,6 +792,12 @@ void fdc_toshiba_setDrive(u8 drive)
 void fdc_toshiba_setSide(u8 side)
 {
     ToshibaFDC.side = side & 1;
+}
+
+void fdc_toshiba_mark_disk_changed(u8 drive)
+{
+    if (drive < sizeof(fdc_toshiba_disk_changed))
+        fdc_toshiba_disk_changed[drive] = 1;
 }
 
 void fdc_toshiba_reset(u8 full_reset)

@@ -1553,6 +1553,7 @@ void VroomDSRunEmu(void)
                                 strcpy(MyMedia[MEDIA_DISK].currdisk, gpFic[ucGameChoice].szName);
                                 MyMedia[MEDIA_DISK].filesize = ReadFileCarefully(MyMedia[MEDIA_DISK].currdisk, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, NULL);
                                 fdc_init(2, (MyMedia[MEDIA_DISK].filesize / 1024 == 360) ? 1 : 2, 80, 9, 512, 1, DISK_Memory, DISK_Memory1);
+                                fdc_media_changed(0);
                                 fdc_reset(false);
                             }
                             BottomScreenKeypad();

@@ -588,6 +588,12 @@ void fdc_setSide(u8 side)
     FDC.side = side;                        // Record the side in use
 }
 
+void fdc_media_changed(u8 drive)
+{
+    if (myConfig.fdc_driver == 1)
+        fdc_toshiba_mark_disk_changed(drive);
+}
+
 // ---------------------------------------------------------------
 // Reset the floppy drive controller... get ready for activity...
 // ---------------------------------------------------------------

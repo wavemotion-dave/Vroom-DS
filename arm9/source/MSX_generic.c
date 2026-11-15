@@ -1137,6 +1137,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "APPETITE") && strstr(filename, "COMPLETE"))
     {
         myConfig.frameSkip      = FS_LIGHT; // Needs blending
+        myConfig.yOffset        = 15;
         MapCursors();
     }
 

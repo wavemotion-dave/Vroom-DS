@@ -96,6 +96,7 @@ u8   fdc_toshiba_read(u8 addr);
 void fdc_toshiba_write(u8 addr, u8 data);
 void fdc_toshiba_setDrive(u8 drive);
 void fdc_toshiba_setSide(u8 side);
+void fdc_toshiba_mark_disk_changed(u8 drive);
 void fdc_toshiba_reset(u8 full_reset);
 void fdc_toshiba_init(u8 drives, u8 sides, u8 tracks, u8 sectors,
                       u16 sectorSize, u8 startSector,
