@@ -380,8 +380,6 @@ void handle_pcm_sound(mm_word len, mm_addr dest)
     for (int i = 0; i < len; i++)
     {
         s32 ay = output[i];
-        ay -= ay >> 2;
-
         s32 combined = ay + 32767 + PCM_MixSample(&pcmRead, pcmCount);
         
         if (combined > 32767)
@@ -2850,10 +2848,8 @@ u32 LoopZ80(void)
 
     if (mid_frame_interrupt)
     {
-        if (--mid_frame_interrupt == 0)
-        {
-            RefereshPreviousLine();
-        }
+        RefereshPreviousLine();
+        mid_frame_interrupt = 0;
     }
 
     extern u16 turbo_timer;
@@ -2866,7 +2862,7 @@ u32 LoopZ80(void)
     {
         pcm_samples[pcm_sample_write] = (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
         pcm_sample_write++;
-    }    
+    }
     
     // Run the FDC engine
     LoopFDC();
@@ -2882,9 +2878,10 @@ u32 LoopZ80(void)
     {
         IntZ80(&CPU, CPU.IRequest);
         CPU.NumInts++;                                                                   // Track Interrupt Requests
+
         if (((CurLine - 1) >= VDP9938_START_LINE) && ((CurLine - 1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
         {
-            mid_frame_interrupt = 3; // Let CPU run for 2 lines then redraw the previous 2...
+            mid_frame_interrupt = 1;
         }
     }
 

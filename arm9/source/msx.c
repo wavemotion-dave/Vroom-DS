@@ -59,7 +59,6 @@ u8 pcm_samples[PCM_SAMPLE_BUFFER_SIZE] __attribute__((section(".dtcm")));
 volatile u16 pcm_sample_write __attribute__((section(".dtcm"))) = 0;
 u8 pcm_sample_current __attribute__((section(".dtcm"))) = 128;
 s32 pcm_sample_filtered __attribute__((section(".dtcm"))) = 0;
-u8 s1990_skip_leftover = 0;
 
 // Provides the "PAC OPPL" string needed for some games to detect SRAM
 u8 FAKE_FMPAC[0x2000];
@@ -251,27 +250,52 @@ __attribute__((noinline)) u8 read_port_E5(void)
     }
 }
 
+typedef struct {
+    dpair PC;
+    pair SP, AF, BC, DE, HL, AF1, BC1, DE1, HL1, IX, IY;
+    u8 I, R, R_HighBit, IFF;
+} CPURegs;   // adjust field types to match your Z80 struct
+
+static CPURegs saved_regs[2];
+
+static inline void SaveRegs(CPURegs *d) {
+    d->PC=CPU.PC; d->SP=CPU.SP; d->AF=CPU.AF; d->BC=CPU.BC; d->DE=CPU.DE; d->HL=CPU.HL;
+    d->AF1=CPU.AF1; d->BC1=CPU.BC1; d->DE1=CPU.DE1; d->HL1=CPU.HL1;
+    d->IX=CPU.IX; d->IY=CPU.IY; d->I=CPU.I; d->R=CPU.R; d->R_HighBit=CPU.R_HighBit; d->IFF=CPU.IFF;
+}
+
+static inline void LoadRegs(const CPURegs *s)
+{
+    CPU.PC = s->PC;   CPU.SP = s->SP;
+    CPU.AF = s->AF;   CPU.BC = s->BC;   CPU.DE = s->DE;   CPU.HL = s->HL;
+    CPU.AF1 = s->AF1; CPU.BC1 = s->BC1; CPU.DE1 = s->DE1; CPU.HL1 = s->HL1;
+    CPU.IX = s->IX;   CPU.IY = s->IY;
+    CPU.I = s->I;     CPU.R = s->R;     CPU.R_HighBit = s->R_HighBit;
+    CPU.IFF = s->IFF;
+}
+
 __attribute__((noinline)) void write_port_E5(u8 Value)
 {
     switch(s1990_reg_idx)
     {
         case 6:
-            debug[DX++ & 7] = Value;
-            debug[DX & 7] = 9999;
-            
             if (last_port_write == 0xE5) // If we just wrote E5, this is a leftover Z80->R800 write...
             {
-                last_port_write = 0x00; // Next one is real no matter what...
-                break;
+                //last_port_write = 0x00; // Next one is real no matter what...
+                //break;
             }
             
             s1990_reg6 = Value & 0x60;
-            s1990_is_r800 = !(s1990_reg6 & 0x20);
+            s1990_is_r800 = (s1990_reg6 & 0x20) ? 0:1;
 
-            turbo_r_boost = s1990_is_r800;
-            
-            debug[11] = turbo_r_boost;
-
+            // Are we switching CPUs?
+            if (turbo_r_boost != s1990_is_r800)
+            {
+                SaveRegs(&saved_regs[turbo_r_boost]);      // departing CPU, old mode
+                LoadRegs(&saved_regs[s1990_is_r800]);      // arriving CPU
+                turbo_r_boost = s1990_is_r800;
+            }
+           
             break;
 
         default:
@@ -1646,7 +1670,6 @@ void msx_reset(void)
     pcm_sample_write = 0;
     pcm_sample_current = 128;
     pcm_sample_filtered = 0;
-    s1990_skip_leftover = 0;
     s1990_is_r800 = 0;
     s1990_reg6 = 0x60;
     s1990_reg_idx = 0;
@@ -1673,6 +1696,10 @@ void msx_reset(void)
     MSX_InitialMemoryLayout();
     
     Mouse_Reset();
+    
+    memset(saved_regs, 0x00, sizeof(saved_regs));
+    saved_regs[0].SP.W = 0xF000;
+    saved_regs[1].SP.W = 0xF000;
 
     // -------------------------------------------------
     // If a disk was part of the setup, load it now...

@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 512
-#define CONFIG_VER                  0x0004
+#define CONFIG_VER                  0x0005
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
