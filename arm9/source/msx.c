@@ -1112,7 +1112,7 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
         if (++msx_music_writes == 10) // Arbitrary... if we hit it at least 10 times, we turn on MSX MUSIC output
         {
             msx_music_capable_game = 1;
-            bClickRemoveNeeded = 1;
+            bClickRemoveNeeded = 5;
         }
 
         YMWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address

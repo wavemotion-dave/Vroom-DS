@@ -854,7 +854,7 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 // Melodic FM is rendered at half the output rate; rhythm and filtering
 // remain at the full output rate.
 // -------------------------------------------------------------------------
-static __attribute__((noinline)) s32 PCM_MixSample(u16 *read, u16 count)
+__attribute__((noinline)) s32 PCM_MixSample(u16 *read, u16 count)
 {
     if (*read < count)
     {

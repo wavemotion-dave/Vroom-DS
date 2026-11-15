@@ -121,7 +121,10 @@ u8 touch_debounce = 0;         // A bit of touch-screen debounce
 u8 key_debounce = 0;           // A bit of key debounce
 u8 msx_caps_lock = 0;          // Set to 1 when MSX caps lock is active
 u8 msx_kana_lock = 0;          // Set to 1 when MSX kana lock is active
-u8 dampen_turbo_icon = 2;
+u8 dampen_turbo_icon = 0;      // After we show the icon, don't change it for a bit
+static s32 ay_smoothed __attribute__((section(".dtcm"))) = 0;
+const s32 MAX_STEP = 1600;   // tune by ear - start here, adjust to taste
+
 
 // The DS/DSi has 12 keys that can be mapped
 u16 NDS_keyMap[12] __attribute__((section(".dtcm"))) = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_A, KEY_B, KEY_X, KEY_Y, KEY_R, KEY_L, KEY_START, KEY_SELECT};
@@ -264,13 +267,21 @@ s16 last_sample __attribute__((section(".dtcm"))) = 0;
 mm_word ClickRemoval(mm_word len, mm_addr dest)
 {
     s16 mix1[16];
+    s16 mix2[16];
 
     ay38910Mixer(16, mix1, &myAY); // Mix AY and give us something to move towards
 
     if (msx_music_capable_game)
     {
-        YMMixer(len - 16, dest, &myYM); // Keep the YM stepping normally
         YMMixer(16, mix1, &myYM);       // Mix directly on top of AY
+    }
+    else if (msx_scc_capable_game)
+    {
+        SCCMixer(16, mix2, &mySCC);       // Get SCC samples
+        s32 sample = mix1[15] + mix2[15]; // And mix them together...
+        if (sample > 32767) sample = 32767;
+        else if (sample < -32767) sample = -32767;
+        mix1[15] = sample;
     }
     
     int target = mix1[15];          // This is what we are smoothing towards
@@ -295,12 +306,101 @@ mm_word ClickRemoval(mm_word len, mm_addr dest)
     return len;
 }
 
+s16 mixer[buffer_size];
+
+void handle_scc_sound(mm_word len, mm_addr dest)
+{
+    // ---------------------------------------------------------------------
+    // For any large steps we want to smooth this out so that we don't hear
+    // the AY produce any sharp pops or clicks... this helps but costs CPU.
+    // ---------------------------------------------------------------------
+    int count = len;
+    s16 *p = dest;
+    s32 smoothed = ay_smoothed;
+
+    while (count--)
+    {
+        s32 diff = (s32)*p - smoothed;
+        if (diff > MAX_STEP) diff = MAX_STEP;
+        else if (diff < -MAX_STEP) diff = -MAX_STEP;
+        
+        smoothed += diff;
+        *p++ = (s16)smoothed;
+    }
+    ay_smoothed = smoothed;
+    
+    SCCMixer(len, mixer, &mySCC); // Get SCC samples
+
+    // ------------------------------------------------------------------------
+    // And now we need to mix them... with a bit of audio filtering on the DSi
+    // ------------------------------------------------------------------------
+    s16 *output = (s16 *)dest;
+    u16 pcmRead = 0;
+    u16 pcmCount = pcm_sample_write;
+
+    for (int i = 0; i < len; i++)
+    {
+        s32 ay = output[i];
+        ay -= ay >> 2;
+
+        s32 scc = mixer[i];
+        scc -= scc >> 2;
+
+        s32 combined = ay + scc;
+        
+        if (myConfig.pcm)
+        {
+            combined += PCM_MixSample(&pcmRead, pcmCount);
+        }
+
+        if (combined > 32767)
+        {
+            combined = 32767;
+        }
+        else if (combined < -32768)
+        {
+            combined = -32768;
+        }
+
+        output[i] = (s16)combined;
+    }
+    
+    pcm_sample_write = 0;
+}
+
+void handle_pcm_sound(mm_word len, mm_addr dest)
+{
+    // ------------------------------------------------------------------------
+    // We need to mix them... with a bit of audio filtering on the DSi
+    // ------------------------------------------------------------------------
+    s16 *output = (s16 *)dest;
+    u16 pcmRead = 0;
+    u16 pcmCount = pcm_sample_write;
+
+    for (int i = 0; i < len; i++)
+    {
+        s32 ay = output[i];
+        ay -= ay >> 2;
+
+        s32 combined = ay + 32767 + PCM_MixSample(&pcmRead, pcmCount);
+        
+        if (combined > 32767)
+        {
+            combined = 32767;
+        }
+        else if (combined < -32768)
+        {
+            combined = -32768;
+        }
+
+        output[i] = (s16)combined;
+    }
+    pcm_sample_write = 0;
+}
 // -----------------------------------------------------------------------------------------------
 // This is our main sound mixer. It's called periodically by the maxmod handler when it needs
 // more samples in the buffer. We mix AY + MSX-MUSIC as that's the sound setup for Illusion City.
 // -----------------------------------------------------------------------------------------------
-s16 mixer[buffer_size];
-
 ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
 {
     if (soundEmuPause) // If paused, just "mix" in mute sound chip... all channels are OFF
@@ -328,34 +428,11 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         }
         else if (msx_scc_capable_game) // If SCC is enabled, we need to mix the AY with the SCC chips
         {
-            SCCMixer(len, mixer, &mySCC); // Get SCC samples
-
-            // ------------------------------------------------------------------------
-            // And now we need to mix them... with a bit of audio filtering on the DSi
-            // ------------------------------------------------------------------------
-            s16 *output = (s16 *)dest;
-
-            for (int i = 0; i < len; i++)
-            {
-                s32 ay = output[i];
-                ay -= ay >> 2;
-
-                s32 scc = mixer[i];
-                scc -= scc >> 2;
-
-                s32 combined = ay + scc;
-
-                if (combined > 32767)
-                {
-                    combined = 32767;
-                }
-                else if (combined < -32768)
-                {
-                    combined = -32768;
-                }
-
-                output[i] = (s16)combined;
-            }
+            handle_scc_sound(len, dest);
+        }
+        else if (myConfig.pcm)
+        {
+            handle_pcm_sound(len, dest);
         }
         
         last_sample = ((s16 *)dest)[len - 1];
@@ -418,6 +495,7 @@ void sound_chip_reset()
 
     msx_music_capable_game = 0; // Until proven otherwise
     msx_scc_capable_game = 0;   // Until proven otherwise
+    ay_smoothed = 0;
 
     // -----------------------------------------------------------
     // The AY sound chip is for our baseline MSX sound handling.
@@ -473,7 +551,7 @@ void ResetMSX(void)
     msx_caps_lock = 0; // MSX CAPS lock off
     msx_kana_lock = 0; // MSX KANA lock off
     
-    dampen_turbo_icon = 3;
+    dampen_turbo_icon = 0;
 
     zoom_screen = 0; // Assume no zoom to start
     screenPanX = 0;
@@ -670,19 +748,23 @@ void DisplayStatusLine(void)
     // If not showing FPS, show the Turbo Icon
     if (!myGlobalConfig.showFPS)
     {
-        if (dampen_turbo_icon) dampen_turbo_icon--;
-
-        if (turbo_r_boost && !dampen_turbo_icon)
+        if (dampen_turbo_icon)
         {
-            DSPrint(0, 0, 2, "$%");
-            DSPrint(0, 1, 2, "DE");
+            dampen_turbo_icon--;
         }
-        
-        if (!turbo_r_boost || dampen_turbo_icon)
+        else // Show the icon or clear it...
         {
-            if (!turbo_r_boost) dampen_turbo_icon = 3;
-            DSPrint(0, 0, 0, "  ");
-            DSPrint(0, 1, 0, "  ");
+            if (turbo_r_boost)
+            {
+                DSPrint(0, 0, 2, "$%");
+                DSPrint(0, 1, 2, "DE");
+            }
+            else
+            {
+                DSPrint(0, 0, 0, "  ");
+                DSPrint(0, 1, 0, "  ");
+            }
+            dampen_turbo_icon = 3;
         }
     }
 
@@ -2778,7 +2860,7 @@ u32 LoopZ80(void)
     
     extern u8 pcm_counter;
     pcm_counter++;
-    
+
     if (myConfig.pcm && pcm_sample_write < PCM_SAMPLE_BUFFER_SIZE)
     {
         pcm_samples[pcm_sample_write] = (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;

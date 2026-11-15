@@ -585,7 +585,7 @@ void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 val
                 if (!msx_scc_capable_game)
                 {
                     msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
-                    bClickRemoveNeeded = 1;
+                    bClickRemoveNeeded = 5;
                 }
             }
             else
