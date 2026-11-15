@@ -1036,6 +1036,7 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.pcm            = 1;
     }
 
     if (strstr(filename, "ILLUSION") && strstr(filename, "CITY"))
@@ -1249,6 +1250,7 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.fdc_driver     = FDC_WD;
         myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.ymBalance      = YM_BAL_HIGH;
         myConfig.frameSkip      = FS_HEAVY;
     }
 
@@ -1256,6 +1258,7 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.fdc_driver     = FDC_TOSH;
         myConfig.frameSkip      = FS_NONE;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
     }
     
     if (strstr(filename, "MYU") && strstr(filename, "SIOS"))
@@ -1270,6 +1273,7 @@ void ApplyDatabaseTweaks(void)
         myConfig.fdc_driver     = FDC_WD;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.frameSkip      = FS_HEAVY;
+        myConfig.ymBalance      = YM_BAL_HIGH;
     }
     
     if (strstr(filename, "RANMA") && strstr(filename, "NIBUNNOICHI"))
@@ -1290,17 +1294,17 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "SOUTH") && strstr(filename, "HERO"))
     {
         myConfig.yOffset        = 5;
-        myConfig.fdc_driver     = FDC_WD;
+        myConfig.fdc_driver     = FDC_TOSH;
     }
     
     if (strstr(filename, "SPACE") && strstr(filename, "PANIC"))
     {
-        myConfig.fdc_driver     = FDC_WD;
+        myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "STAGE") && strstr(filename, "11"))
     {
-        myConfig.fdc_driver     = FDC_WD;
+        myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "S.T.G."))
@@ -1313,14 +1317,14 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "SWEET"))
     {
         myConfig.yOffset        = 2;
-        myConfig.fdc_driver     = FDC_WD;
+        myConfig.fdc_driver     = FDC_TOSH;
         myConfig.frameSkip      = FS_LIGHT; // Needs blending
     }
     
     if (strstr(filename, "HAMARAJA") && strstr(filename, "NIGHT"))
     {
         myConfig.yOffset        = 15;
-        myConfig.fdc_driver     = FDC_WD;
+        myConfig.fdc_driver     = FDC_TOSH;
         myConfig.pcm            = 1;
     }
     

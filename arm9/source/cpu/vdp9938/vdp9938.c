@@ -100,7 +100,7 @@ void RebuildPalLUT(void)
 
 // Call after any store to XPal[idx] where idx is 0..15.
 // Only the 31 entries that use that color change.
-ITCM_CODE void PalLutUpdate(u8 idx)
+void PalLutUpdate(u8 idx)
 {
     if (idx > 15) return;
 

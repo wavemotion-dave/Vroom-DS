@@ -42,7 +42,19 @@ extern u8 Unmapped_Memory[];
 // -----------------------------------------------------------------------------------------------
 ITCM_CODE u8 cpu_readmem16(u16 address)
 {
-    if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && myConfig.fdc_driver == 1 && (address >= 0x7FF0) && (address <= 0x7FFF))
+    // ----------------------------------------------------
+    // Are we reading from the SCC chip memory mapped area?
+    // ----------------------------------------------------
+    if ((special_memory_access & SPEC_MEM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
+    {
+        if (bCartInPage[2])
+        {
+            u16 off = address & 0xFF;
+            if (off < 0x80) return SCCRead(off, &mySCC);
+            else if (off < 0x90) return SCCRead(off + 0x20, &mySCC);
+        }        
+    }
+    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && myConfig.fdc_driver == 1 && (address >= 0x7FF0) && (address <= 0x7FFF))
     {
         return fdc_read(address & 0x0F);
     }
@@ -526,6 +538,11 @@ void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 val
     // -----------------------------------------------------------------------------------
     // Are we writing to the SCC chip memory mapped area and are the registers "in view"?
     // -----------------------------------------------------------------------------------
+    if ((special_memory_access & SPEC_MEM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
+    {
+         SCC_LegacyWrite(value, address&0xFF);
+    }
+    else // We only handle bank switching if the SCC registers were not accessed above...
     {
         // --------------------------------------------------------
         // Konami 8K mapper with SCC
@@ -558,6 +575,24 @@ void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 val
         }
         else if ((address & 0xF800) == 0x9000)
         {
+            // --------------------------------------------------------------------------------------------------
+            // For standard SCC carts we require the full 0x3F to be programmed to enable the SCC register view.
+            // And yes, the banking logic below is still always called...
+            // --------------------------------------------------------------------------------------------------
+            if ((value & 0x3F) == 0x3F)
+            {
+                special_memory_access |= SPEC_MEM_SCC_ENABLED;  // SCC Registers are now "in view"
+                if (!msx_scc_capable_game)
+                {
+                    msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
+                    bClickRemoveNeeded = 1;
+                }
+            }
+            else
+            {
+                special_memory_access &= ~SPEC_MEM_SCC_ENABLED; // SCC Registers are no longer "in view"
+            }
+
             MSXCartPtr[media_id][4] = (u8*)src;  // Main ROM
             MSXCartPtr[media_id][0] = (u8*)src;  // Mirror
             MemoryMap[4] = (u8 *)(MSXCartPtr[media_id][4]) - 0x8000;
@@ -580,6 +615,7 @@ void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 val
         }
     }
 }
+
 
 
 // --------------------------------------------------------------------

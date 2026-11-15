@@ -35,11 +35,15 @@ u8 *MSXCartPtr[2][8]        __attribute__((section(".dtcm"))) = { {0,0,0,0,0,0,0
 u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
 u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;      // True if game is making use of MSX-MUSIC (YM Sound)
+u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;      // True if game is making use of Konami SCC
 u8 special_memory_access    __attribute__((section(".dtcm"))) = 0x00;   // This lets us know we've got something special mapped into memory
 u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;      // If we cross a threshold, we decare we are MSX-MUSIC capable (and mix in the proper sound)
 u8 msx_subslot3              __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
 u8 msx_subslot0             __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
 u16 turbo_timer             __attribute__((section(".dtcm"))) = 0x0000; // Rough Turbo-R timer handling - advanced 16 ticks every scanline.
+u8 last_port_write          __attribute__((section(".dtcm"))) = 0x00;
+
+SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 YM      myYM                __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
 
@@ -156,7 +160,7 @@ void store_nibbles(uint8_t rtc_sub_ram[], int index_1, int index_10, int val)
 // ---------------------------------------------------------------------------------------
 // Grab system time/date and populate RTC registers... unlikely any program really cares.
 // ---------------------------------------------------------------------------------------
-void populate_msx_rtc()
+__attribute__((noinline)) void populate_msx_rtc()
 {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
@@ -217,7 +221,6 @@ u8 s1990_reg5 = 0;
 __attribute__((noinline)) void write_port_E4(u8 Value)
 {
     s1990_reg_idx = Value;
-    s1990_skip_leftover = 0;          // new register select = new sequence
 }
 
 
@@ -253,18 +256,21 @@ __attribute__((noinline)) void write_port_E5(u8 Value)
     switch(s1990_reg_idx)
     {
         case 6:
-            if (s1990_skip_leftover)
+            debug[DX++ & 7] = Value;
+            debug[DX & 7] = 9999;
+            
+            if (last_port_write == 0xE5) // If we just wrote E5, this is a leftover Z80->R800 write...
             {
-                s1990_skip_leftover = 0;
-                if (Value & 0x20) break;          // leftover Z80 write after a Z80->R800 switch: drop it
+                last_port_write = 0x00; // Next one is real no matter what...
+                break;
             }
             
             s1990_reg6 = Value & 0x60;
             s1990_is_r800 = !(s1990_reg6 & 0x20);
-            turbo_r_boost = s1990_is_r800;
 
-            if (s1990_is_r800)
-                s1990_skip_leftover = 1;   // an E4h select clears it, so a real switch back to Z80 still works
+            turbo_r_boost = s1990_is_r800;
+            
+            debug[11] = turbo_r_boost;
 
             break;
 
@@ -509,8 +515,7 @@ static u16 KanjiAdr = 0;       // Shared 12-bit character address
 static u8  KanjiCounter = 0;   // Byte within 32-byte glyph
 static u8  KanjiLevel = 0;     // Selected level: 0 or 1
 
-__attribute__((noinline))
-uint8_t ReadPort_KanjiDriver(uint8_t port)
+__attribute__((noinline)) uint8_t ReadPort_KanjiDriver(uint8_t port)
 {
     if (port == 0xD9 || port == 0xDB)
     {
@@ -528,8 +533,7 @@ uint8_t ReadPort_KanjiDriver(uint8_t port)
     return 0xFF;
 }
 
-__attribute__((noinline))
-void WritePort_KanjiDriver(uint8_t port, uint8_t value)
+__attribute__((noinline)) void WritePort_KanjiDriver(uint8_t port, uint8_t value)
 {
     switch (port)
     {
@@ -1055,13 +1059,6 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     {
         pcm_last_a4 = Value;
         pcm_counter = 0x00;
-
-        if (myConfig.pcm && pcm_sample_write < PCM_SAMPLE_BUFFER_SIZE)
-        {
-            pcm_samples[pcm_sample_write] =
-                (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
-            pcm_sample_write++;
-        }
     }
     else if (Port == 0xA5) // PCM
     {
@@ -1128,6 +1125,8 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     {
         //debug[DX++ & 0xF] = Port;
     }
+    
+    last_port_write = Port;    
 }
 
 // --------------------------------------------------------------------------
@@ -1583,6 +1582,35 @@ void MSX_InitialMemoryLayout(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Classic Konami SCC register layout (relative to 9800h) puts the register
+// block at 0x80 and shares one 32-byte waveform between Ch3 and Ch4 (the
+// SCC+ driver instead treats 0x80-0x9F as Ch4's own independent wave RAM
+// and moved the register block to 0xA0) - so classic-mode writes need to be
+// relocated before reaching SCCWrite, and Ch3 wave writes need to be mirrored
+// into Ch4's wave RAM to reproduce the real shared-waveform behavior.
+// ---------------------------------------------------------------------------
+void SCC_LegacyWrite(u8 value, u16 address)
+{
+    u8 off = address & 0xFF;
+
+    if (off < 0x60)                        // Ch0-Ch2 wave RAM - untouched by the layout shift
+    {
+        SCCWrite(value, off, &mySCC);
+    }
+    else if (off < 0x80)                   // Ch3 wave RAM - also mirror into Ch4 (shared on real hardware)
+    {
+        SCCWrite(value, off, &mySCC);
+        SCCWrite(value, off + 0x20, &mySCC);
+    }
+    else if (off < 0x90)                   // Old freq/vol/control block (0x80-0x8F) -> new 0xA0-0xAF block
+    {
+        SCCWrite(value, off + 0x20, &mySCC);
+    }
+    // Otherwise it's one of the mirrors or deformation registers which we aren't emulating yet...
+}
+
+
 // ---------------------------------------------------------------
 // Restore the MSX BIOS into the memory buffer and point to it...
 // ---------------------------------------------------------------
@@ -1635,6 +1663,7 @@ void msx_reset(void)
     KanjiAdr = 0;
     KanjiCounter = 0;
     KanjiLevel = 0;
+    last_port_write = 0x00;
     
     mirror_ram_bank[0] = 3;
     mirror_ram_bank[1] = 2;

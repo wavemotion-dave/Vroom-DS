@@ -27,10 +27,10 @@
 //@----------------------------------------------------------------------------
 //@ Tunables.
 //@----------------------------------------------------------------------------
-#define YM_SAMPLE_RATE 18600            // confirmed value, matches the AY driver's rate
-#define YM_MASTER_CLOCK 3579545         // MSX standard clock, same as SCC's
-#define YM_SIN_SHIFT 24                 // phase>>24 -> 8-bit (256 entry) table index
-#define YM_GAIN_RAMP_STEP 16            // Gain ramp toward full level on key-on.
+#define YM_SAMPLE_RATE      18600       // confirmed value, matches the AY driver's rate
+#define YM_MASTER_CLOCK     3579545     // MSX standard clock, same as SCC's
+#define YM_SIN_SHIFT        24          // phase>>24 -> 8-bit (256 entry) table index
+#define YM_GAIN_RAMP_STEP   16          // Gain ramp toward full level on key-on.
 #define YM_PERCUSSION_RELEASE_STEP 3500 // PERCUSSION release rate: higher = faster decay for more distinct drum hits.
 
 

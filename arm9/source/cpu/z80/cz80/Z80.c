@@ -635,9 +635,15 @@ int ExecZ80(register int RunCycles)
         case PFX_DD: CodesDD();break;
       }
     }
+    
+    // If we switched CPU modes... bail!
+    if (turbo_r_boost)
+    {
+        return CPU.ICount;
+    }
 
     /* Unless we have come here after EI, exit */
-    if(!(CPU.IFF&IFF_EI)) return(CPU.ICount);
+    if(!(CPU.IFF&IFF_EI)) return CPU.ICount;
     else
     {
       /* Done with AfterEI state */

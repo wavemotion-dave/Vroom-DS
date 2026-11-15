@@ -35,6 +35,7 @@
 #include "msx_music.h"
 #include "options.h"
 #include "topscreen.h"
+#include "cpu/scc/SCC.h"
 #include "cpu/z80/Z80_interface.h"
 #include "printf.h"
 #include "screenshot.h"
@@ -120,6 +121,7 @@ u8 touch_debounce = 0;         // A bit of touch-screen debounce
 u8 key_debounce = 0;           // A bit of key debounce
 u8 msx_caps_lock = 0;          // Set to 1 when MSX caps lock is active
 u8 msx_kana_lock = 0;          // Set to 1 when MSX kana lock is active
+u8 dampen_turbo_icon = 2;
 
 // The DS/DSi has 12 keys that can be mapped
 u16 NDS_keyMap[12] __attribute__((section(".dtcm"))) = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_A, KEY_B, KEY_X, KEY_Y, KEY_R, KEY_L, KEY_START, KEY_SELECT};
@@ -265,7 +267,7 @@ mm_word ClickRemoval(mm_word len, mm_addr dest)
 
     ay38910Mixer(16, mix1, &myAY); // Mix AY and give us something to move towards
 
-    if (msx_music_capable_game || myConfig.pcm)
+    if (msx_music_capable_game)
     {
         YMMixer(len - 16, dest, &myYM); // Keep the YM stepping normally
         YMMixer(16, mix1, &myYM);       // Mix directly on top of AY
@@ -297,6 +299,8 @@ mm_word ClickRemoval(mm_word len, mm_addr dest)
 // This is our main sound mixer. It's called periodically by the maxmod handler when it needs
 // more samples in the buffer. We mix AY + MSX-MUSIC as that's the sound setup for Illusion City.
 // -----------------------------------------------------------------------------------------------
+s16 mixer[buffer_size];
+
 ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
 {
     if (soundEmuPause) // If paused, just "mix" in mute sound chip... all channels are OFF
@@ -314,12 +318,46 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
             return ClickRemoval(len, dest);
         }
 
+        // Always grab AY samples...
         ay38910Mixer(len, dest, &myAY);
-        if (msx_music_capable_game || myConfig.pcm)
+        
+        // Then it's either MSX-MUSIC or SCC to mix in...
+        if (msx_music_capable_game)
         {
             YMMixer(len, dest, &myYM);
         }
+        else if (msx_scc_capable_game) // If SCC is enabled, we need to mix the AY with the SCC chips
+        {
+            SCCMixer(len, mixer, &mySCC); // Get SCC samples
 
+            // ------------------------------------------------------------------------
+            // And now we need to mix them... with a bit of audio filtering on the DSi
+            // ------------------------------------------------------------------------
+            s16 *output = (s16 *)dest;
+
+            for (int i = 0; i < len; i++)
+            {
+                s32 ay = output[i];
+                ay -= ay >> 2;
+
+                s32 scc = mixer[i];
+                scc -= scc >> 2;
+
+                s32 combined = ay + scc;
+
+                if (combined > 32767)
+                {
+                    combined = 32767;
+                }
+                else if (combined < -32768)
+                {
+                    combined = -32768;
+                }
+
+                output[i] = (s16)combined;
+            }
+        }
+        
         last_sample = ((s16 *)dest)[len - 1];
     }
 
@@ -379,6 +417,7 @@ void sound_chip_reset()
     bClickRemoveNeeded = 150; // When we re-enable... smooth it to avoid pops/clicks
 
     msx_music_capable_game = 0; // Until proven otherwise
+    msx_scc_capable_game = 0;   // Until proven otherwise
 
     // -----------------------------------------------------------
     // The AY sound chip is for our baseline MSX sound handling.
@@ -388,6 +427,12 @@ void sound_chip_reset()
     ay38910DataW(0x3F, &myAY);      // All OFF (negative logic)
     ay38910Mixer(8, mixbuf, &myAY); // Do an initial mix conversion to prime the output
     myAY.ayPortBOut = 0x80;         // Kana Lock off to start
+
+    // -----------------------------------------------------------------
+    // The SCC sound chip is just for a few select Konami MSX1 games
+    // -----------------------------------------------------------------
+    SCCReset(&mySCC);
+    SCCMixer(8, mixbuf, &mySCC); // Do an initial mix conversion to prime the output
 
     // -----------------------------------------------------------------
     // The YM2413 chip is the MSX MUSIC standard for late-era games...
@@ -427,6 +472,8 @@ void ResetMSX(void)
 
     msx_caps_lock = 0; // MSX CAPS lock off
     msx_kana_lock = 0; // MSX KANA lock off
+    
+    dampen_turbo_icon = 3;
 
     zoom_screen = 0; // Assume no zoom to start
     screenPanX = 0;
@@ -618,6 +665,25 @@ void DisplayStatusLine(void)
     {
         DSPrint(28, 0, 0, "    ");
         DSPrint(28, 1, 0, "    ");
+    }
+    
+    // If not showing FPS, show the Turbo Icon
+    if (!myGlobalConfig.showFPS)
+    {
+        if (dampen_turbo_icon) dampen_turbo_icon--;
+
+        if (turbo_r_boost && !dampen_turbo_icon)
+        {
+            DSPrint(0, 0, 2, "$%");
+            DSPrint(0, 1, 2, "DE");
+        }
+        
+        if (!turbo_r_boost || dampen_turbo_icon)
+        {
+            if (!turbo_r_boost) dampen_turbo_icon = 3;
+            DSPrint(0, 0, 0, "  ");
+            DSPrint(0, 1, 0, "  ");
+        }
     }
 
     // -----------------------------------------------------------------
@@ -2712,6 +2778,12 @@ u32 LoopZ80(void)
     
     extern u8 pcm_counter;
     pcm_counter++;
+    
+    if (myConfig.pcm && pcm_sample_write < PCM_SAMPLE_BUFFER_SIZE)
+    {
+        pcm_samples[pcm_sample_write] = (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
+        pcm_sample_write++;
+    }    
     
     // Run the FDC engine
     LoopFDC();
