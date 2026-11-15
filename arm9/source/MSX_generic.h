@@ -94,6 +94,7 @@ struct __attribute__((__packed__)) Config_t
 extern u8 pcm_last_a4;
 extern u8 pcm_last_a5;
 extern u8 pcm_samples[PCM_SAMPLE_BUFFER_SIZE];
+extern volatile u16 pcm_sample_read;
 extern volatile u16 pcm_sample_write;
 extern u8 pcm_sample_current;
 extern s32 pcm_sample_filtered;

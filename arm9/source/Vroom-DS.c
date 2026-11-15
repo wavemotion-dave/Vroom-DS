@@ -335,8 +335,6 @@ void handle_scc_sound(mm_word len, mm_addr dest)
     // And now we need to mix them... with a bit of audio filtering on the DSi
     // ------------------------------------------------------------------------
     s16 *output = (s16 *)dest;
-    u16 pcmRead = 0;
-    u16 pcmCount = pcm_sample_write;
 
     for (int i = 0; i < len; i++)
     {
@@ -350,7 +348,7 @@ void handle_scc_sound(mm_word len, mm_addr dest)
         
         if (myConfig.pcm)
         {
-            combined += PCM_MixSample(&pcmRead, pcmCount);
+            combined += PCM_MixSample();
         }
 
         if (combined > 32767)
@@ -364,8 +362,6 @@ void handle_scc_sound(mm_word len, mm_addr dest)
 
         output[i] = (s16)combined;
     }
-    
-    pcm_sample_write = 0;
 }
 
 void handle_pcm_sound(mm_word len, mm_addr dest)
@@ -374,13 +370,11 @@ void handle_pcm_sound(mm_word len, mm_addr dest)
     // We need to mix them... with a bit of audio filtering on the DSi
     // ------------------------------------------------------------------------
     s16 *output = (s16 *)dest;
-    u16 pcmRead = 0;
-    u16 pcmCount = pcm_sample_write;
 
     for (int i = 0; i < len; i++)
     {
         s32 ay = output[i];
-        s32 combined = ay + 32767 + PCM_MixSample(&pcmRead, pcmCount);
+        s32 combined = ay + 32767 + PCM_MixSample();
         
         if (combined > 32767)
         {
@@ -393,7 +387,6 @@ void handle_pcm_sound(mm_word len, mm_addr dest)
 
         output[i] = (s16)combined;
     }
-    pcm_sample_write = 0;
 }
 // -----------------------------------------------------------------------------------------------
 // This is our main sound mixer. It's called periodically by the maxmod handler when it needs
@@ -2858,10 +2851,10 @@ u32 LoopZ80(void)
     extern u8 pcm_counter;
     pcm_counter++;
 
-    if (myConfig.pcm && pcm_sample_write < PCM_SAMPLE_BUFFER_SIZE)
+    if (myConfig.pcm)
     {
         pcm_samples[pcm_sample_write] = (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
-        pcm_sample_write++;
+        pcm_sample_write = (pcm_sample_write + 1) % PCM_SAMPLE_BUFFER_SIZE;
     }
     
     // Run the FDC engine

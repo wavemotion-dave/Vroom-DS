@@ -855,11 +855,12 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 // remain at the full output rate.
 // -------------------------------------------------------------------------
 #define MAX_PCM_GAP 4096
-__attribute__((noinline)) s32 PCM_MixSample(u16 *read, u16 count)
+__attribute__((noinline)) s32 PCM_MixSample(void)
 {
-    if (*read < count)
+    if (pcm_sample_read != pcm_sample_write)
     {
-        pcm_sample_current = pcm_samples[(*read)++];
+        pcm_sample_current = pcm_samples[pcm_sample_read];
+        pcm_sample_read = (pcm_sample_read + 1) % PCM_SAMPLE_BUFFER_SIZE;
     }
 
     s32 target = ((s32)pcm_sample_current - 128) * 128;
@@ -874,8 +875,6 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 {
     int i;
     int pcmEnabled = myConfig.pcm;
-    u16 pcmCount = pcmEnabled ? pcm_sample_write : 0;
-    u16 pcmRead = 0;
     int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
     int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
 
@@ -1099,7 +1098,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 
         if (pcmEnabled)
         {
-            sample += PCM_MixSample(&pcmRead, pcmCount);
+            sample += PCM_MixSample();
         }
 
         /* Mix one synthesized sample into the existing output buffer. */
@@ -1110,11 +1109,6 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
         else if (mixed < -32768) mixed = -32768;
 
         dest[i] = (s16)mixed;
-    }
-
-    if (pcmEnabled)
-    {
-        pcm_sample_write = 0;
     }
 }
 
