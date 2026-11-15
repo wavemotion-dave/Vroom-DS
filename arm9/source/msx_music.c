@@ -854,6 +854,7 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 // Melodic FM is rendered at half the output rate; rhythm and filtering
 // remain at the full output rate.
 // -------------------------------------------------------------------------
+#define MAX_PCM_GAP 4096
 __attribute__((noinline)) s32 PCM_MixSample(u16 *read, u16 count)
 {
     if (*read < count)
@@ -863,8 +864,8 @@ __attribute__((noinline)) s32 PCM_MixSample(u16 *read, u16 count)
 
     s32 target = ((s32)pcm_sample_current - 128) * 128;
     s32 difference = target - pcm_sample_filtered;
-    if (difference > 2048) difference = 2048;
-    else if (difference < -2048) difference = -2048;
+    if (difference > MAX_PCM_GAP) difference = MAX_PCM_GAP;
+    else if (difference < -MAX_PCM_GAP) difference = -MAX_PCM_GAP;
     pcm_sample_filtered += difference;
     return pcm_sample_filtered;
 }

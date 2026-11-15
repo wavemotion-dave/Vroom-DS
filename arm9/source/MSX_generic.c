@@ -1164,6 +1164,7 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.frameSkip      = FS_LIGHT; // Needs blending
         myConfig.MIDI           = 0xFF;
+        myConfig.ymBalance      = YM_BAL_HIGH;
         MapCursors();
     }
     
