@@ -366,26 +366,11 @@ void handle_scc_sound(mm_word len, mm_addr dest)
 
 void handle_pcm_sound(mm_word len, mm_addr dest)
 {
-    // ------------------------------------------------------------------------
-    // We need to mix them... with a bit of audio filtering on the DSi
-    // ------------------------------------------------------------------------
     s16 *output = (s16 *)dest;
 
     for (int i = 0; i < len; i++)
     {
-        s32 ay = output[i];
-        s32 combined = ay + 32767 + PCM_MixSample();
-        
-        if (combined > 32767)
-        {
-            combined = 32767;
-        }
-        else if (combined < -32768)
-        {
-            combined = -32768;
-        }
-
-        output[i] = (s16)combined;
+        output[i] = PCM_MixSample();
     }
 }
 // -----------------------------------------------------------------------------------------------
@@ -2853,8 +2838,23 @@ u32 LoopZ80(void)
 
     if (myConfig.pcm)
     {
-        pcm_samples[pcm_sample_write] = (pcm_last_a5 & 0x02) ? pcm_last_a4 : 128;
-        pcm_sample_write = (pcm_sample_write + 1) % PCM_SAMPLE_BUFFER_SIZE;
+        int pcmActive = (pcm_last_a5 & 0x02) != 0;
+        if (pcmActive)
+        {
+            if (pcm_sample_silence_frames >= PCM_SAMPLE_SILENCE_FRAMES)
+            {
+                pcm_sample_delay_frames = PCM_SAMPLE_DELAY_FRAMES;
+            }
+            pcm_sample_silence_frames = 0;
+            pcm_sample_frame_active = 1;
+        }
+
+        u16 nextWrite = (pcm_sample_write + 1) & PCM_SAMPLE_BUFFER_MASK;
+        if (nextWrite != pcm_sample_read)
+        {
+            pcm_samples[pcm_sample_write] = pcmActive ? pcm_last_a4 : 128;
+            pcm_sample_write = nextWrite;
+        }
     }
     
     // Run the FDC engine
@@ -2882,6 +2882,18 @@ u32 LoopZ80(void)
     if (CurLine == VDP9938_END_LINE)
     {
         CPU.CycleDeficit = 0; // Start fresh at the VBlank boundary. Keeps frame timing consistent.
+        if (pcm_sample_delay_frames)
+        {
+            pcm_sample_delay_frames--;
+        }
+        if (pcm_sample_frame_active)
+        {
+            pcm_sample_frame_active = 0;
+        }
+        else if (pcm_sample_silence_frames < PCM_SAMPLE_SILENCE_FRAMES)
+        {
+            pcm_sample_silence_frames++;
+        }
         return 0;
     }
     return 1;

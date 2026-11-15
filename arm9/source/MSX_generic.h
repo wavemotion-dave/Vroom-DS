@@ -90,12 +90,18 @@ struct __attribute__((__packed__)) Config_t
     u8  reserved6;
 };
 
-#define PCM_SAMPLE_BUFFER_SIZE 512
+#define PCM_SAMPLE_BUFFER_SIZE 4096
+#define PCM_SAMPLE_BUFFER_MASK (PCM_SAMPLE_BUFFER_SIZE - 1)
+#define PCM_SAMPLE_DELAY_FRAMES 8
+#define PCM_SAMPLE_SILENCE_FRAMES 20
 extern u8 pcm_last_a4;
 extern u8 pcm_last_a5;
 extern u8 pcm_samples[PCM_SAMPLE_BUFFER_SIZE];
 extern volatile u16 pcm_sample_read;
 extern volatile u16 pcm_sample_write;
+extern volatile u8 pcm_sample_delay_frames;
+extern volatile u8 pcm_sample_silence_frames;
+extern volatile u8 pcm_sample_frame_active;
 extern u8 pcm_sample_current;
 extern s32 pcm_sample_filtered;
 

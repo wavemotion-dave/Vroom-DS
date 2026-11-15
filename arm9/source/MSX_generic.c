@@ -1191,6 +1191,7 @@ void ApplyDatabaseTweaks(void)
         myConfig.fdc_driver     = FDC_WD;
         myConfig.frameSkip      = FS_LIGHT; // Needs blending
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
+        myConfig.ymBalance      = YM_BAL_HIGH;
         myConfig.fakeFMPAC      = 1;
         myConfig.pcm            = 1;
     }

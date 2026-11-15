@@ -55,9 +55,12 @@ u32 dos22_bank = 0;
 u8 pcm_counter = 0;
 u8 pcm_last_a4 = 0;
 u8 pcm_last_a5 = 0;
-u8 pcm_samples[PCM_SAMPLE_BUFFER_SIZE] __attribute__((section(".dtcm")));
+u8 pcm_samples[PCM_SAMPLE_BUFFER_SIZE];
 volatile u16 pcm_sample_read __attribute__((section(".dtcm"))) = 0;
 volatile u16 pcm_sample_write __attribute__((section(".dtcm"))) = 0;
+volatile u8 pcm_sample_delay_frames __attribute__((section(".dtcm"))) = 0;
+volatile u8 pcm_sample_silence_frames __attribute__((section(".dtcm"))) = PCM_SAMPLE_SILENCE_FRAMES;
+volatile u8 pcm_sample_frame_active __attribute__((section(".dtcm"))) = 0;
 u8 pcm_sample_current __attribute__((section(".dtcm"))) = 128;
 s32 pcm_sample_filtered __attribute__((section(".dtcm"))) = 0;
 
@@ -1670,6 +1673,9 @@ void msx_reset(void)
     pcm_last_a5 = 0;
     pcm_sample_read = 0;
     pcm_sample_write = 0;
+    pcm_sample_delay_frames = 0;
+    pcm_sample_silence_frames = PCM_SAMPLE_SILENCE_FRAMES;
+    pcm_sample_frame_active = 0;
     pcm_sample_current = 128;
     pcm_sample_filtered = 0;
     s1990_is_r800 = 0;

@@ -857,10 +857,10 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 #define MAX_PCM_GAP 4096
 __attribute__((noinline)) s32 PCM_MixSample(void)
 {
-    if (pcm_sample_read != pcm_sample_write)
+    if (!pcm_sample_delay_frames && pcm_sample_read != pcm_sample_write)
     {
         pcm_sample_current = pcm_samples[pcm_sample_read];
-        pcm_sample_read = (pcm_sample_read + 1) % PCM_SAMPLE_BUFFER_SIZE;
+        pcm_sample_read = (pcm_sample_read + 1) & PCM_SAMPLE_BUFFER_MASK;
     }
 
     s32 target = ((s32)pcm_sample_current - 128) * 128;
@@ -868,7 +868,7 @@ __attribute__((noinline)) s32 PCM_MixSample(void)
     if (difference > MAX_PCM_GAP) difference = MAX_PCM_GAP;
     else if (difference < -MAX_PCM_GAP) difference = -MAX_PCM_GAP;
     pcm_sample_filtered += difference;
-    return pcm_sample_filtered;
+    return (pcm_sample_filtered * 5) / 4;
 }
 
 ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)

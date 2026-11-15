@@ -59,6 +59,16 @@ Known Issues :
 
 Version History :
 -----------------------
+Version 0.7 - 15-Nov-2026 by wavemotion-dave
+* Real R800 timing and actual CPU context switching for improved accuracy.
+* PCM buffer so voice samples sound better.
+* SCC added back from Hachibitto so games like Goonies R Enough with voice now work as does games like Nemesis 3 with Turbo R enhancements (no slowdown, smooth scroll, etc).
+* New Turbo 'Flame' icon when running in Turbo-R native R800 mode.
+* Lots of other bug fixes and improvements as time permitted.
+
+Version 0.6 - 14-Nov-2026 by wavemotion-dave
+* Minor bug fixes.
+
 Version 0.5 - 13-Nov-2026 by wavemotion-dave
 * First beta version released.
 
