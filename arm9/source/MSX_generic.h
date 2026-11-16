@@ -177,7 +177,7 @@ extern u8 zanac_glitch_patch;
 
 #define    MAX_CART_SIZE_KB     4096    // 4MB Cart
 #define    MAX_DISK_SIZE_KB     720     // Standard DSDD
-#define    RAM_SIZE_KB          512    // 2MB RAM
+#define    RAM_SIZE_KB          2048    // 2MB RAM
 
 extern u8 *ROM_Memory;
 extern u8 *DISK_Memory;

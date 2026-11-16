@@ -25,10 +25,9 @@
 #include "fdc_toshiba.h"
 #include "printf.h"
 
-#define SHADOW_ROM_END  512 // The S1990 controller and BIOS will put shadow ROM just before this
-#define SHADOW_MAIN  (SHADOW_ROM_END-64)
-#define SHADOW_SUB   (SHADOW_ROM_END-32)
-#define SHADOW_KANJI (SHADOW_ROM_END-16)
+#define SHADOW_MAIN  (RAM_SIZE_KB-64) // The S1990 controller and BIOS will put shadow ROM just before RAM end
+#define SHADOW_SUB   (RAM_SIZE_KB-32)
+#define SHADOW_KANJI (RAM_SIZE_KB-16)
 
 // -------------------------------------------------------------
 // Some MSX Mapper / Slot Handling and sound generation stuff...
@@ -711,8 +710,9 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
 #if 0
     if (Port != 0x98 && Port != 0x99 && Port != 0xA2 && Port != 0xA9 && Port != 0xAA && Port != 0xE6 && Port != 0xA8)
     {
-        debug[DX++ & 0xF] = Port;
-        debug[DX & 0xF] = 999999;
+        //debug[DX++ & 0xF] = Port;
+        //debug[DX & 0xF] = 999999;
+        debug_printf("R %02X\n", Port);
     }
 #endif
   //98h~9Bh   Access to the VDP I/O ports.
@@ -1099,6 +1099,15 @@ void msx_slot_map_turboR(unsigned char Value)
 ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
 {
     static u8 msx_music_register = 0;
+
+#if 0
+    if (Port != 0x98 && Port != 0x99 && Port != 0xA2 && Port != 0xA9 && Port != 0xAA && Port != 0xE6 && Port != 0xA8)
+    {
+        //debug[DX++ & 0xF] = Port;
+        //debug[DX & 0xF] = 999999;
+        debug_printf("W %02X=%02X\n", Port, Value);
+    }
+#endif
 
     if      (Port == 0x98) {WrData9938(Value);}                 // VDP Data
     else if (Port == 0x99) {WrCtrl9938(Value);}                 // VDP Control
