@@ -25,6 +25,11 @@
 #include "fdc_toshiba.h"
 #include "printf.h"
 
+#define SHADOW_ROM_END  512 // The S1990 controller and BIOS will put shadow ROM just before this
+#define SHADOW_MAIN  (SHADOW_ROM_END-64)
+#define SHADOW_SUB   (SHADOW_ROM_END-32)
+#define SHADOW_KANJI (SHADOW_ROM_END-16)
+
 // -------------------------------------------------------------
 // Some MSX Mapper / Slot Handling and sound generation stuff...
 // -------------------------------------------------------------
@@ -258,7 +263,7 @@ typedef struct {
     dpair PC;
     pair SP, AF, BC, DE, HL, AF1, BC1, DE1, HL1, IX, IY;
     u8 I, R, R_HighBit, IFF;
-} CPURegs;   // adjust field types to match your Z80 struct
+} CPURegs;   // adjust field types to match Z80 struct
 
 static CPURegs saved_regs[2];
 
@@ -283,12 +288,7 @@ __attribute__((noinline)) void write_port_E5(u8 Value)
     switch(s1990_reg_idx)
     {
         case 6:
-            if (last_port_write == 0xE5) // If we just wrote E5, this is a leftover Z80->R800 write...
-            {
-                //last_port_write = 0x00; // Next one is real no matter what...
-                //break;
-            }
-            
+            u8 old_reg6 = s1990_reg6;
             s1990_reg6 = Value & 0x60;
             s1990_is_r800 = (s1990_reg6 & 0x20) ? 0:1;
 
@@ -299,7 +299,16 @@ __attribute__((noinline)) void write_port_E5(u8 Value)
                 LoadRegs(&saved_regs[s1990_is_r800]);      // arriving CPU
                 turbo_r_boost = s1990_is_r800;
             }
-           
+            
+            u8 changed = old_reg6 ^ s1990_reg6;
+            if (changed & 0x40)                       // DRAM bit changed, either direction
+            {
+                if (s1990_reg6 == 0x00)
+                {
+                    // Diagnostics here...
+                }
+                msx_slot_map_turboR(Port_PPI_A);
+            }
             break;
 
         default:
@@ -803,6 +812,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
 // Slot map for this emulation roughly resembles the Panasonic A1GT machine but 
 // without the Panasonic mapper in slot 3-3 and with the PAC-SRAM in slot 2.
 // ------------------------------------------------------------------------------
+
 void msx_slot_map_turboR(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT3_ACTIVE;  // Until proven otherwise below...
@@ -817,8 +827,16 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 0;
-                MemoryMap[0] = TURBO_BIOS;
-                MemoryMap[1] = TURBO_BIOS;
+                if (s1990_reg6 == 0x00)
+                {
+                    MemoryMap[0] = RAM_Memory + (SHADOW_MAIN * 1024);
+                    MemoryMap[1] = RAM_Memory + (SHADOW_MAIN * 1024);
+                }
+                else
+                {
+                    MemoryMap[0] = TURBO_BIOS;
+                    MemoryMap[1] = TURBO_BIOS;
+                }
             }
             else
             {
@@ -845,8 +863,16 @@ void msx_slot_map_turboR(unsigned char Value)
             bRAMInPage[0] = 0;
             if (((msx_subslot3 & 0x03) >> 0) == 1) // Subslot 1 has Extended BIOS
             {
-                MemoryMap[0] = (u8 *)TURBO_SUB;
-                MemoryMap[1] = (u8 *)TURBO_SUB;
+                if (s1990_reg6 == 0x00)
+                {
+                    MemoryMap[0] = RAM_Memory + (SHADOW_SUB * 1024);
+                    MemoryMap[1] = RAM_Memory + (SHADOW_SUB * 1024);
+                }
+                else
+                {
+                    MemoryMap[0] = (u8 *)TURBO_SUB;
+                    MemoryMap[1] = (u8 *)TURBO_SUB;
+                }
             }
             else if (((msx_subslot3 & 0x03) >> 0) == 0) // Subslot 0 has RAM Mapper
             {
@@ -870,8 +896,16 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
-                MemoryMap[2] = TURBO_BIOS;
-                MemoryMap[3] = TURBO_BIOS;
+                if (s1990_reg6 == 0x00)
+                {
+                    MemoryMap[2] = RAM_Memory + (SHADOW_MAIN * 1024);
+                    MemoryMap[3] = RAM_Memory + (SHADOW_MAIN * 1024);
+                }
+                else
+                {
+                    MemoryMap[2] = TURBO_BIOS;
+                    MemoryMap[3] = TURBO_BIOS;
+                }
             }
             else if (((msx_subslot0 & 0x0C) >> 2) == 1) // Subslot 0-1 FDC Disk Driver
             {
@@ -947,7 +981,7 @@ void msx_slot_map_turboR(unsigned char Value)
                 if (msx_dos22)
                 {
                     u8 *dos_rom = (myConfig.fdc_driver == 1) ? TURBO_DOS23 : TURBO_DOS22;
-                    special_memory_access |= myConfig.fdc_driver == 1 ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_EXTDOS22;
+                    special_memory_access |= (myConfig.fdc_driver == 1) ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_EXTDOS22;
                     MemoryMap[2] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
                     MemoryMap[3] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
                 }
@@ -997,8 +1031,16 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[2] = 0;
                 bRAMInPage[2] = 0;
-                MemoryMap[4] = (u8 *)TURBO_KANJI+0x4000 - 0x8000;
-                MemoryMap[5] = (u8 *)TURBO_KANJI+0x6000 - 0xA000;
+                if (s1990_reg6 == 0x00)
+                {
+                    MemoryMap[2] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
+                    MemoryMap[3] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
+                }
+                else
+                {
+                    MemoryMap[4] = (u8 *)TURBO_KANJI+0x4000 - 0x8000;
+                    MemoryMap[5] = (u8 *)TURBO_KANJI+0x6000 - 0xA000;
+                }
             }
             else
             {
@@ -1118,7 +1160,8 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
     {
         u8 page = Port-0xFC;
-        u8 bank = Value & 0x7F; // 2048K is 16K in 128 banks
+        
+        u8 bank = Value & ((RAM_SIZE_KB / 16) - 1); // 2048K is 16K in 128 banks
 
         mirror_ram_bank[page] = bank; // For read-back
 

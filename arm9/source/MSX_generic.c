@@ -1025,11 +1025,12 @@ void ApplyDatabaseTweaks(void)
     // ROM Games
     if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
     {
-        zone_terra_hack         = 900; // Roughly 15 seconds of holding the A button to bypass intro...
+        //zone_terra_hack         = 900; // Roughly 15 seconds of holding the A button to bypass intro...
         myConfig.yOffset        = 9;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.fdc_driver     = FDC_WD;
+        myConfig.pcm            = 1;
     }
 
     if (strstr(filename, "DARAIAYU"))

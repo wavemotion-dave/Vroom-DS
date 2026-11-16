@@ -418,6 +418,8 @@ static void fdc_toshiba_complete_format(void)
     fdc_toshiba_set_transfer_result(fdc_toshiba_status0(0), 0, 0);
 }
 
+static u8 fdc_toshiba_id_sector;   // rotating Read ID sector counter
+
 static void fdc_toshiba_execute_command(void)
 {
     u8 operation = ToshibaFDC.command & 0x1F;
@@ -498,6 +500,7 @@ static void fdc_toshiba_execute_command(void)
         case 0x08: // Sense interrupt status
         {
             u8 result[2];
+            u8 count;
             if (ToshibaFDC.tc_pending_interrupt)
             {
                 result[0] = ToshibaFDC.tc_pending_st0;
@@ -505,33 +508,44 @@ static void fdc_toshiba_execute_command(void)
                 ToshibaFDC.tc_pending_interrupt = 0;
                 ToshibaFDC.tc_pending_st0 = 0;
                 ToshibaFDC.int_req = 0;
+                count = 2;
             }
             else
             {
-                // No seek/recalibrate completion is pending: report invalid
-                // interrupt status (ST0 bit 7), as a 765-compatible FDC does.
+                // Nothing pending: a 765-family chip returns just ST0 = 0x80
+                // (invalid), with no PCN byte following.
                 result[0] = TC_ST0_INVALID;
-                result[1] = ToshibaFDC.drive < 2
-                                ? ToshibaFDC.tc_current_track[ToshibaFDC.drive]
-                                : 0;
+                result[1] = 0;
+                count = 1;
             }
-            fdc_toshiba_set_result(result, sizeof(result));
+            fdc_toshiba_set_result(result, count);
             break;
         }
 
         case 0x0A: // Read ID
         {
-            // A flat DSK has no rotational ID stream; report its first sector.
+            // A flat DSK has no rotating ID stream, so cycle through the
+            // sectors on each call, as headers would pass under the head.
             u8 unit_head = ToshibaFDC.tc_parameters[0];
             u8 drive = unit_head & 3;
+            u8 first = ToshibaGeom.startSector;
+            u8 r;
+
             ToshibaFDC.drive = drive;
             ToshibaFDC.side = (unit_head >> 2) & 1;
             ToshibaFDC.track = drive < 2 ? ToshibaFDC.tc_current_track[drive] : 0;
+
+            if (fdc_toshiba_id_sector < first ||
+                fdc_toshiba_id_sector >= (u16)first + ToshibaGeom.sectors)
+                fdc_toshiba_id_sector = first;
+            r = fdc_toshiba_id_sector++;
+
             ToshibaFDC.tc_transfer_cylinder = ToshibaFDC.track;
             ToshibaFDC.tc_transfer_head = ToshibaFDC.side;
-            ToshibaFDC.tc_transfer_sector = ToshibaGeom.startSector;
+            ToshibaFDC.tc_transfer_sector = r;
             ToshibaFDC.tc_parameters[4] = fdc_toshiba_size_code();
-            if (!fdc_toshiba_sector_ptr(ToshibaFDC.drive, ToshibaFDC.track, ToshibaFDC.side, ToshibaGeom.startSector))
+
+            if (!fdc_toshiba_sector_ptr(ToshibaFDC.drive, ToshibaFDC.track, ToshibaFDC.side, r))
                 fdc_toshiba_set_transfer_result(fdc_toshiba_status0(1), TC_ST1_NO_DATA, 0);
             else
                 fdc_toshiba_set_transfer_result(fdc_toshiba_status0(0), 0, 0);

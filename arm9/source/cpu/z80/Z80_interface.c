@@ -518,12 +518,12 @@ void __attribute__((noinline)) HandleNeo16(u8 media_id, u16 address, u8 value)
 // MSX DOS 2 by ASCII only maps 0x4000-0x7FFF and the hotpsot is at 0x7FFE
 void __attribute__((noinline)) HandleMSXDOS2(u16 address, u8 value)
 {
-    dos22_bank = (value & 3);
-    u8 *dos_rom = TURBO_DOS22;
-    u8 *src = dos_rom + (dos22_bank * 0x4000);
-
     if (address == 0x7FFE) // The hot-spot for the ASCII external DOS2.2
     {
+        dos22_bank = (value & 3);
+        u8 *dos_rom = TURBO_DOS22;
+        u8 *src = dos_rom + (dos22_bank * 0x4000);
+        
         MemoryMap[2] = (u8*)src + 0x0000 - 0x4000;
         MemoryMap[3] = (u8*)src + 0x2000 - 0x6000;
     }
@@ -691,9 +691,7 @@ void __attribute__((noinline)) HandleDiskControl(u16 address, u8 value)
         if (address == 0x7FF0)
         {
             dos22_bank = (value & 3);
-            u8 *disk_rom = TURBO_DOS23 + (dos22_bank * 0x4000);
-            MemoryMap[2] = disk_rom + 0x0000 - 0x4000;
-            MemoryMap[3] = disk_rom + 0x2000 - 0x6000;
+            msx_slot_map_turboR(Port_PPI_A);
         }
     }
     else // For the WD-2973 FDC driver...
