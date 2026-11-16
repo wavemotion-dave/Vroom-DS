@@ -27,6 +27,8 @@ volatile u8 bufferZone1[32] = {0};      // In case we ever index out of bounds (
 u8 XBuf[2][256*224] ALIGN(32) = {0};    // V9938/V9958 screen is 256x224 (for overscan). We double-buffer the output.
 volatile u8 bufferZone2[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
 
+static __attribute__((noinline)) void ApplyLeftMask(void);
+
 u32 __attribute__((section(".dtcm"))) last_vdp_access = 999;
 inline __attribute__((always_inline)) void VDP9938WaitForR800Access(void)
 {
@@ -55,7 +57,7 @@ u16 screenPanX              __attribute__((section(".dtcm"))) = 0;   // Horizont
 u8 overscan_trick           __attribute__((section(".dtcm"))) = 0;   // Will be set to 1 if game tries to bypass the VSYNC
 
 u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
-                            {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
+                            {1,1,1,0,1,1,1,1,   0,1,1,1,1,1,1,0},  // No frameskip: 80% (yeah... not really none! Such is life on the TurboR)
                             {1,1,0,0,1,1,0,0,   1,1,0,0,1,1,0,0},  // Light: 50% (we draw two consecutive and skip two consecutive)
                             {1,0,0,1,0,0,1,0,   1,0,0,0,1,0,0,1},  // Heavy: 37% frames drawn - scattered to try and avoid games that draw even/odd differently
                         };
@@ -1507,13 +1509,7 @@ void RefreshLine3(u8 uY)
 
     RefreshSprites(uY);
 
-    // R#25 MSK: leftmost 8 pixels show the backdrop (after sprites, so they're masked too)
-    if (VDP[25] & 0x02)
-    {
-        u32 c = 0x10101010;
-        ((u32 *)Row)[0] = c;
-        ((u32 *)Row)[1] = c;
-    }
+    ApplyLeftMask();
   }
 }
 
@@ -1723,6 +1719,7 @@ void RefreshLine4(uint8_t Y)
         T = HandlePageScrollScreen4(T, P, &Pbg, &tiles, &start);
 
         int misaligned = ((uintptr_t)Pbg & 3) != 0;
+        if (myConfig.frameSkip == FS_HEAVY) misaligned=0;
 
         uint32_t *P32 = (uint32_t*)Pbg;
         uint16_t *P16 = (uint16_t*)Pbg;
@@ -1915,6 +1912,7 @@ ITCM_CODE void RefreshLine5(u8 uY)
         // doesn't change mid-line), so check it once rather than per-pixel.
         // (A direct line is always aligned: XBuf rows are 256 bytes.)
         int misaligned = ((uintptr_t)P & 3) != 0;
+        if (myConfig.frameSkip == FS_HEAVY) misaligned=0;
 
         if (!misaligned)
         {

@@ -59,6 +59,12 @@ Known Issues :
 
 Version History :
 -----------------------
+Version 0.8 - 15-Nov-2026 by wavemotion-dave
+* Added real DRAM mode handling for BIOS shadow.
+* Improved audio output - AY now centers at zero. Clicks gone.
+* A few more individual game tweaks for improved gameplay.
+* Minor bug fixes and cleanup as time permitted.
+
 Version 0.7 - 15-Nov-2026 by wavemotion-dave
 * Real R800 timing and actual CPU context switching for improved accuracy.
 * PCM buffer so voice samples sound better.

@@ -1025,7 +1025,7 @@ void ApplyDatabaseTweaks(void)
     // ROM Games
     if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
     {
-        //zone_terra_hack         = 900; // Roughly 15 seconds of holding the A button to bypass intro...
+        zone_terra_hack         = 900; // Roughly 15 seconds of holding the A button to bypass intro...
         myConfig.yOffset        = 9;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
@@ -1310,6 +1310,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "TURBO") && strstr(filename, "BLASTER"))
     {
         myConfig.frameSkip      = FS_NONE;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
     }
 
     if (strstr(filename, "WELKIS") && strstr(filename, "LEGEND"))
@@ -1364,9 +1365,9 @@ void SetDefaultGameConfig(void)
     myConfig.frameSkip = 1;                     // Light frameskip by default... some games will need heavy
     myConfig.ymBalance = YM_BAL_MED;            // Normal YM is scaled mid-level
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
-    myConfig.MIDI = 0x05;
-    myConfig.pcm = 0;
-    myConfig.fakeFMPAC = 0;
+    myConfig.MIDI = 0x05;                       // MIDI idle. Some games want 0xFF.
+    myConfig.pcm = 0;                           // No PCM support by default (it's CPU intensive)
+    myConfig.fakeFMPAC = 0;                     // No fake FM-PAC support (a few games need it)
     myConfig.reserved1 = 0;
     myConfig.reserved2 = 0;
     myConfig.reserved3 = 0;

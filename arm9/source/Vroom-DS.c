@@ -338,13 +338,7 @@ void handle_scc_sound(mm_word len, mm_addr dest)
 
     for (int i = 0; i < len; i++)
     {
-        s32 ay = output[i];
-        ay -= ay >> 2;
-
-        s32 scc = mixer[i];
-        scc -= scc >> 2;
-
-        s32 combined = ay + scc;
+        s32 combined = output[i] + mixer[i];
         
         if (myConfig.pcm)
         {
@@ -728,12 +722,20 @@ void DisplayStatusLine(void)
         {
             dampen_turbo_icon--;
         }
-        else // Show the icon or clear it...
+        else // Show the boost / flame icon or clear it...
         {
             if (turbo_r_boost)
             {
-                DSPrint(0, 0, 2, "$%");
-                DSPrint(0, 1, 2, "DE");
+                if (s1990_reg6 == 0x00)
+                {
+                    DSPrint(0, 0, 2, "\"#");
+                    DSPrint(0, 1, 2, "BC");
+                }
+                else
+                {
+                    DSPrint(0, 0, 2, "$%");
+                    DSPrint(0, 1, 2, "DE");
+                }
             }
             else
             {
@@ -2798,8 +2800,8 @@ int mid_frame_interrupt = 0;
 int H_BlankCycles = 54;
 u32 LoopZ80(void)
 {
-    static const u32 cpu_adjust[4] = {0, 29, 57, 228};
-    static const u32 hsync_adjust[4] = {0, 7, 14, 54};
+    static const u32 cpu_adjust[4] = {0, 29, 45, 228};  // Roughly 3.58Mhz, 4.0MHz, 4.3MHz and 7.16Mhz. We can't handle the last one at anywhere near full speed.
+    static const u32 hsync_adjust[4] = {0, 7, 10, 54};
     
     // Execute 1 scanline worth of CPU instructions
     u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit; // Default to Z80 timing

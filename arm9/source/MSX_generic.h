@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 512
-#define CONFIG_VER                  0x0005
+#define CONFIG_VER                  0x0006
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -203,6 +203,7 @@ extern void msx_set_turbo_dos2_bank(u8 bank);
 #define ASCII16X_COMMAND_ADDRESS(address) ((address) & 0x0FFE)
 
 extern u8 s1990_is_r800;
+extern u8 s1990_reg6;
 
 extern u8 bCartInPage[4];
 extern u8 bRAMInPage[4];

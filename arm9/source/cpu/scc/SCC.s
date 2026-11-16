@@ -135,7 +135,8 @@ sccMixLoop:
 	ldrsb lr,[lr,#0x80]			;@ Channel 4
 	mla r9,r8,lr,r9
 
-	strhpl r9,[r1],#2
+	mov lr,r9,asr#1             ;@ Scale output back a bit as we are mixing without guards!
+    strhpl lr,[r1],#2
 	bhi sccMixLoop
 
 	add r8,r2,#sccCh0Phase

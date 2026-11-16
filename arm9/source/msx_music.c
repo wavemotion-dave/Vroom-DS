@@ -847,6 +847,18 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
     return carrier >> (12 - myConfig.ymBalance);
 }
 
+#define MAX_PCM_GAP 4096
+ITCM_CODE s32 PCM_MixSample(void)
+{
+    if (!pcm_sample_delay_frames && pcm_sample_read != pcm_sample_write)
+    {
+        pcm_sample_current = pcm_samples[pcm_sample_read++];
+        pcm_sample_read &= PCM_SAMPLE_BUFFER_MASK;
+    }
+
+    return ((s32)pcm_sample_current - 128) * 128;
+}
+
 // -------------------------------------------------------------------------
 // And finally the mixer - this is a real hot-spot of emulation given the
 // number of music channels that need to be handled. In ITCM to help speed.
@@ -854,23 +866,6 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 // Melodic FM is rendered at half the output rate; rhythm and filtering
 // remain at the full output rate.
 // -------------------------------------------------------------------------
-#define MAX_PCM_GAP 4096
-__attribute__((noinline)) s32 PCM_MixSample(void)
-{
-    if (!pcm_sample_delay_frames && pcm_sample_read != pcm_sample_write)
-    {
-        pcm_sample_current = pcm_samples[pcm_sample_read];
-        pcm_sample_read = (pcm_sample_read + 1) & PCM_SAMPLE_BUFFER_MASK;
-    }
-
-    s32 target = ((s32)pcm_sample_current - 128) * 128;
-    s32 difference = target - pcm_sample_filtered;
-    if (difference > MAX_PCM_GAP) difference = MAX_PCM_GAP;
-    else if (difference < -MAX_PCM_GAP) difference = -MAX_PCM_GAP;
-    pcm_sample_filtered += difference;
-    return (pcm_sample_filtered * 5) / 4;
-}
-
 ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 {
     int i;
@@ -1090,23 +1085,18 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
             }
         }
 
-        /*
-         * Output filter: one update per output sample. Experimentally this sounds best at >> 5.
-         */
-        sample += (chip->outputFilterState - sample) >> 5;
-        chip->outputFilterState = sample;
-
         if (pcmEnabled)
         {
             sample += PCM_MixSample();
         }
 
         /* Mix one synthesized sample into the existing output buffer. */
-        s32 mixed = ((s32)dest[i] + 32768) + sample;
-
-        // Clamp final mixed result...
-        if (mixed > 32767) mixed = 32767;
-        else if (mixed < -32768) mixed = -32768;
+        s32 mixed = ((s32)dest[i]) + sample;
+        
+        // -----------------------------------------------------------------
+        // We should be clamping the result but we need the speed and
+        // we've not seen any actual clipping yet so we take our chances...
+        // -----------------------------------------------------------------
 
         dest[i] = (s16)mixed;
     }
