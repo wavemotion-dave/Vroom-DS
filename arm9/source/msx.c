@@ -808,11 +808,45 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   return(NORAM);
 }
 
+
+u8 SpecialPage[256] __attribute__((section(".dtcm"), aligned(4))) = {0};
+u8 WriteSlow[256]   __attribute__((section(".dtcm"), aligned(4))) = {0};
+
+void UpdateSpecialPages(void)
+{
+    static u32 lastKey = 0xFFFFFFFF;
+
+    const u32 sccOn  = (special_memory_access & SPEC_MEM_SCC_ENABLED) && bCartInPage[2];
+    const u32 diskOn = special_memory_access & SPEC_MEM_DISK_CONTROLLER;
+    const u32 subOn  = special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE);
+
+    u32 key = (sccOn ? 1 : 0) | (diskOn ? 2 : 0) | (subOn ? 4 : 0)
+            | (bRAMInPage[0] ? 8 : 0)  | (bRAMInPage[1] ? 16 : 0)
+            | (bRAMInPage[2] ? 32 : 0) | (bRAMInPage[3] ? 64 : 0);
+    if (key == lastKey) return;                 // nothing that matters changed
+    lastKey = key;
+
+    // ---- Reads: only 0x7F, 0x98-0x9F and 0xFF can ever be set ----
+    u32 *r = (u32*)&SpecialPage[0x98];          // 0x98 is word-aligned
+    u32 sccFill = sccOn ? 0x01010101 : 0;
+    r[0] = sccFill; r[1] = sccFill;             // 9800-9FFF
+    SpecialPage[0x7F] = diskOn ? 1 : 0;         // 7F00-7FFF
+    SpecialPage[0xFF] = subOn  ? 1 : 0;         // FF00-FFFF
+
+    // ---- Writes: four 16K pages x 64 entries, word fills ----
+    u32 *w = (u32*)WriteSlow;
+    for (int pg = 0; pg < 4; pg++)
+    {
+        u32 v = bRAMInPage[pg] ? 0 : 0x01010101;
+        for (int i = 0; i < 16; i++) *w++ = v;
+    }
+    if (subOn) WriteSlow[0xFF] = 1;             // FFFF subslot register
+}
+
 // ------------------------------------------------------------------------------
 // Slot map for this emulation roughly resembles the Panasonic A1GT machine but 
 // without the Panasonic mapper in slot 3-3 and with the PAC-SRAM in slot 2.
 // ------------------------------------------------------------------------------
-
 void msx_slot_map_turboR(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT3_ACTIVE;  // Until proven otherwise below...
@@ -1091,6 +1125,8 @@ void msx_slot_map_turboR(unsigned char Value)
             }
             break;
     }
+    
+    UpdateSpecialPages();
 }
 
 // -----------------------------------------------------------------------------------------------

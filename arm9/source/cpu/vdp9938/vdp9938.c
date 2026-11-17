@@ -322,7 +322,7 @@ u32 SprTabM     __attribute__((section(".dtcm"))) = 0x3FFF;
 /** collisions. The caller of this will set the flag as needed. **/
 /** Returning zero (0) means no collision. Otherwise collision. **/
 /*****************************************************************/
-ITCM_CODE byte CheckSprites(void)
+byte CheckSprites(void)
 {
   unsigned int I,J,LS,LD;
   byte *S,*D,*PS,*PD,*T;
@@ -403,7 +403,7 @@ ITCM_CODE byte CheckSprites(void)
 /** Returns the last sprite to be scanned or -1 if none.    **/
 /** Also updates 5th sprite fields in the status register.  **/
 /*************************************************************/
-ITCM_CODE int ScanSprites(byte Y, unsigned int *Mask)
+int ScanSprites(byte Y, unsigned int *Mask)
 {
     byte *AT;
     u8 sprite,MS,S5;
@@ -2421,7 +2421,7 @@ void RefreshLine7_Zoomed(u8 uY)
 /** RefreshLine7() ********************************************/
 /** Refresh VDP9938 Screen 7: 512x212, 16 colors bitmap    **/
 /*************************************************************/
-ITCM_CODE void RefreshLine7(u8 uY)
+void RefreshLine7(u8 uY)
 {
     DEBUG_REFRESH(7);
 

@@ -169,7 +169,7 @@ case DEC_E:    M_DEC(CPU.DE.B.l);break;
 case DEC_H:    M_DEC(CPU.HL.B.h);break;
 case DEC_L:    M_DEC(CPU.HL.B.l);break;
 case DEC_A:    M_DEC(CPU.AF.B.h);break;
-case DEC_xHL:  I=RdZ80(CPU.HL.W);M_DEC(I);WrZ80(CPU.HL.W,I);break;
+case DEC_xHL:  I=RdZ80(CPU.HL.W);M_DEC(I);WrZ80f(CPU.HL.W,I);break;
 
 case INC_B:    M_INC(CPU.BC.B.h);break;
 case INC_C:    M_INC(CPU.BC.B.l);break;
@@ -178,7 +178,7 @@ case INC_E:    M_INC(CPU.DE.B.l);break;
 case INC_H:    M_INC(CPU.HL.B.h);break;
 case INC_L:    M_INC(CPU.HL.B.l);break;
 case INC_A:    M_INC(CPU.AF.B.h);break;
-case INC_xHL:  I=RdZ80(CPU.HL.W);M_INC(I);WrZ80(CPU.HL.W,I);break;
+case INC_xHL:  I=RdZ80(CPU.HL.W);M_INC(I);WrZ80f(CPU.HL.W,I);break;
 
 case RLCA:
   I=CPU.AF.B.h&0x80? C_FLAG:0;
@@ -348,13 +348,13 @@ case LD_E_BYTE:   CPU.DE.B.l=OpZ80(CPU.PC.W++);break;
 case LD_H_BYTE:   CPU.HL.B.h=OpZ80(CPU.PC.W++);break;
 case LD_L_BYTE:   CPU.HL.B.l=OpZ80(CPU.PC.W++);break;
 case LD_A_BYTE:   CPU.AF.B.h=OpZ80(CPU.PC.W++);break;
-case LD_xHL_BYTE: WrZ80(CPU.HL.W,OpZ80(CPU.PC.W++));break;
+case LD_xHL_BYTE: WrZ80f(CPU.HL.W,OpZ80(CPU.PC.W++));break;
 
 case LD_xWORD_HL:
   J.B.l=OpZ80(CPU.PC.W++);
   J.B.h=OpZ80(CPU.PC.W++);
-  WrZ80(J.W++,CPU.HL.B.l);
-  WrZ80(J.W,CPU.HL.B.h);
+  WrZ80f(J.W++,CPU.HL.B.l);
+  WrZ80f(J.W,CPU.HL.B.h);
   break;
 
 case LD_HL_xWORD:
@@ -373,7 +373,7 @@ case LD_A_xWORD:
 case LD_xWORD_A:
   J.B.l=OpZ80(CPU.PC.W++);
   J.B.h=OpZ80(CPU.PC.W++);
-  WrZ80(J.W,CPU.AF.B.h);
+  WrZ80f(J.W,CPU.AF.B.h);
   break;
 
 case EX_HL_xSP:

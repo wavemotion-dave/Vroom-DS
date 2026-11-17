@@ -36,6 +36,8 @@ extern u32 debug[];
 extern u32 DX, DY;
 extern u8 *MemoryMap[8];
 extern u8 turbo_r_boost;
+extern u8 SpecialPage[256];
+extern u8 WriteSlow[256];
 
 /** System-Dependent Stuff ***********************************/
 /** This is system-dependent code put here to speed things  **/
@@ -43,8 +45,27 @@ extern u8 turbo_r_boost;
 /*************************************************************/
 
 inline byte OpZ80(u32 A)    {return (MemoryMap[A>>13][A]);}
-inline byte RdZ80(word A)   {if (!special_memory_access) return (MemoryMap[A>>13][A]); else return cpu_readmem16(A);}
-#define     WrZ80(A,V)       cpu_writemem16(A,V)
+
+static inline byte RdZ80(word A)
+{
+    if (__builtin_expect(SpecialPage[A >> 8], 0)) return cpu_readmem16(A);
+    return MemoryMap[A >> 13][A];
+}
+
+#define WrZ80f WrZ80
+
+ITCM_CODE __attribute__((noinline)) void WrZ80(word A, byte V)
+{
+    if (__builtin_expect(WriteSlow[A >> 8], 0)) cpu_writemem16(A, V);
+    else MemoryMap[A >> 13][A] = V;
+}
+
+inline void WrZ80fast(word A, byte V)
+{
+    if (__builtin_expect(WriteSlow[A >> 8], 0)) cpu_writemem16(A, V);
+    else MemoryMap[A >> 13][A] = V;
+}
+
 
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)
 #define     InZ80(P)         cpu_readport_msx(P)
@@ -108,8 +129,8 @@ inline byte RdZ80(word A)   {if (!special_memory_access) return (MemoryMap[A>>13
   CPU.PC.W=J.W; \
   JumpZ80(J.W)
 
-#define M_JP  CPU.PC.W = (u32)OpZ80(CPU.PC.W) | ((u32)OpZ80((CPU.PC.W+1)&0xFFFF) << 8);
-#define M_JR  CPU.PC.W+=(offset)OpZ80(CPU.PC.W)+1;CPU.PC.W &= 0xFFFF; JumpZ80(CPU.PC.W)
+#define M_JP  CPU.PC.W = (u32)OpZ80(CPU.PC.W) | ((u32)OpZ80((CPU.PC.W+1)) << 8);
+#define M_JR  CPU.PC.W+=(offset)OpZ80(CPU.PC.W)+1; JumpZ80(CPU.PC.W)
 #define M_RET CPU.PC.B.l=OpZ80(CPU.SP.W++);CPU.PC.B.h=OpZ80(CPU.SP.W++);JumpZ80(CPU.PC.W)
 
 #define M_RST(Ad)      \
@@ -625,6 +646,7 @@ int ExecZ80(register int RunCycles)
 #define CYCLES_JR_NOT_TAKEN 5
 #define CYCLES_CALL_TAKEN 7
 #define CYCLES_RET_TAKEN 6
+#define WrZ80f WrZ80
 #include "Codes.h"
 #undef CYCLES_JR_NOT_TAKEN
 #undef CYCLES_CALL_TAKEN
@@ -677,10 +699,18 @@ ITCM_CODE int ExecR800(register int RunCycles)
 #define CYCLES_JR_NOT_TAKEN 1
 #define CYCLES_CALL_TAKEN 2
 #define CYCLES_RET_TAKEN 2
+#undef WrZ80f
+#define WrZ80f WrZ80fast
+#undef M_PUSH
+#define M_PUSH(Rg)  WrZ80f(--CPU.SP.W,CPU.Rg.B.h);WrZ80f(--CPU.SP.W,CPU.Rg.B.l)
+#undef M_RST
+#define M_RST(Ad)   WrZ80f(--CPU.SP.W,CPU.PC.B.h);WrZ80f(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
 #include "Codes.h"
 #undef CYCLES_JR_NOT_TAKEN
 #undef CYCLES_CALL_TAKEN
 #undef CYCLES_RET_TAKEN
+#undef WrZ80f
+#define WrZ80f WrZ80
         case PFX_CB: CodesCB_R800();break;
         case PFX_ED: CodesED_R800();break;
         case PFX_FD: CodesFD_R800();break;

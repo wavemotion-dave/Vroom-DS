@@ -1352,13 +1352,14 @@ void VroomDSRunEmu(void)
                 DisplayStatusLine();
             }
 
-            // ----------------------------
-            // Time 1 frame... 546 (NTSC)
-            // ----------------------------
+            // ----------------------------------------------------------------------------
+            // Time 1 frame... 546 (NTSC). On the Turbo-R we spend very little time
+            // in this loop as we're almost always falling behind due to the CPU pressure.
+            // ----------------------------------------------------------------------------
             while (TIMER2_DATA < (546*(timingFrames+1)))
             {
                 if (skip_render) break;
-            }            
+            }
 
             // And copy out XBuf[] to the DS VRAM!
             msxUpdateScreen();

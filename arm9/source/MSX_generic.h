@@ -148,6 +148,7 @@ extern u8 msx_dos22;
 extern u32 dos22_bank;
 extern u16 zone_terra_hack;
 extern u8 turbo_r_boost;
+extern u8 SpecialPage[256];
 
 extern FI_MSX gpFic[MAX_FILES];
 extern int ucGameAct;
@@ -289,5 +290,5 @@ extern void MsxRestoreFlash(void);
 extern void Mouse_PollHost(void);
 extern void SCC_LegacyWrite(u8 value, u16 address);
 extern void msx_slot_map_turboR(unsigned char Value);
-
+extern void UpdateSpecialPages(void);
 #endif

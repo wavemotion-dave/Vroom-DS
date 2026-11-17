@@ -1088,6 +1088,7 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.msxMapper      = SCC8;
         myConfig.frameSkip      = FS_LIGHT;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.fdc_driver     = FDC_TOSH;
     }
 
@@ -1255,7 +1256,7 @@ void ApplyDatabaseTweaks(void)
     
     if (strstr(filename, "PARA") && strstr(filename, "DREAM"))
     {
-        myConfig.cpuBoost       = CPU_BOOST_SLOW;
+        myConfig.cpuBoost       = CPU_BOOST_MED;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.ymBalance      = YM_BAL_HIGH;
     }

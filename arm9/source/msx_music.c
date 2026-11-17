@@ -848,7 +848,7 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
 }
 
 #define MAX_PCM_GAP 4096
-ITCM_CODE s32 PCM_MixSample(void)
+inline s32 PCM_MixSample(void)
 {
     if (!pcm_sample_delay_frames && pcm_sample_read != pcm_sample_write)
     {
