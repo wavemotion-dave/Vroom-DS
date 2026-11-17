@@ -53,7 +53,7 @@ Known Issues :
 -----------------------
 * Speed is not fully accurate. It's the best I could do on the little handheld... some games play just fine and others will have slowdown.
 * The MSX Translations version of Illusion City only runs in the 4MB ASC16X ROM version (which is more convenient anyway). You can use Flash or SRAM to save progress.
-* Daraiayu Taikenban hits this emulation HARD and as such is glitchy. PCM isn't enabled here as it sounds terrible with the lack of CPU to drive this one.
+* Daraiayu Taikenban hits this emulation HARD and as such is glitchy. PCM is enabled but due to the slowdown, it doesn't sound very good.
 * STG Special has major graphical glitches happening in the score area. Reason unknown but probably inaccurate R800 timing.
 * Don't try to run non-Turbo-R games on this thing... most of the MSX mappers are not present and SCC emulation is missing. Use Hachibitto for your general MSX emulation needs - this is to play around with Turbo R games.
 
@@ -64,6 +64,7 @@ Version 0.8 - 15-Nov-2026 by wavemotion-dave
 * Improved audio output - AY now centers at zero. Clicks gone.
 * A few more individual game tweaks for improved gameplay.
 * Minor bug fixes and cleanup as time permitted.
+* 0.8a with reworked CPU read/write memory handling for an almost 10% speedup!
 
 Version 0.7 - 15-Nov-2026 by wavemotion-dave
 * Real R800 timing and actual CPU context switching for improved accuracy.
