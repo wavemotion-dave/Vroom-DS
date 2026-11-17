@@ -23,9 +23,8 @@
 
 #define R800_VDP_ACCESS_WAIT 20
 
-volatile u8 bufferZone1[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
-u8 XBuf[2][256*224] ALIGN(32) = {0};    // V9938/V9958 screen is 256x224 (for overscan). We double-buffer the output.
-volatile u8 bufferZone2[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
+// Declare XBuf as 2 pointers, each pointing to a 256-byte row
+u8 *XBuf[2] = {(u8 *)0x06000000, (u8 *)0x06020000};
 
 static __attribute__((noinline)) void ApplyLeftMask(void);
 
@@ -59,7 +58,7 @@ u8 overscan_trick           __attribute__((section(".dtcm"))) = 0;   // Will be 
 u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
                             {1,1,1,0,1,1,1,1,   0,1,1,1,1,1,1,0},  // No frameskip: 80% (yeah... not really none! Such is life on the TurboR)
                             {1,1,0,0,1,1,0,0,   1,1,0,0,1,1,0,0},  // Light: 50% (we draw two consecutive and skip two consecutive)
-                            {1,0,0,1,0,0,1,0,   1,0,0,0,1,0,0,1},  // Heavy: 37% frames drawn - scattered to try and avoid games that draw even/odd differently
+                            {1,1,0,0,0,0,1,1,   0,0,0,0,1,1,0,0},  // Heavy: 37% frames drawn - scattered to try and avoid games that draw even/odd differently
                         };
 
 u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
@@ -3451,7 +3450,10 @@ ITCM_CODE void Loop9938(void)
       // -------------------------------------
       if (!skip_render)
       {
-          drawn_frame_number++; // This one is for A/B pixels for the 512px modes... and must track only frames drawn
+        extern u8 ready_to_flip, flip_to;
+        flip_to = drawn_frame_number & 1;
+        drawn_frame_number++; // This one is for A/B pixels for the 512px modes... and must track only frames drawn
+        ready_to_flip = 1;
       }
       frame_number++; // This one tracks all frames... drawn or skipped
 
@@ -3506,7 +3508,6 @@ void Reset9938(void)
     
     XPal[16] = 4;   // Set to 'almost black' for left border mask (not accurate but we don't show border anyway!)
 
-    memset(XBuf,        0x00, sizeof(XBuf));         // Ensure the A:B buffers are clear
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers

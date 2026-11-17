@@ -1025,7 +1025,7 @@ void ApplyDatabaseTweaks(void)
     // ROM Games
     if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
     {
-        zone_terra_hack         = 900; // Roughly 15 seconds of holding the A button to bypass intro...
+        zone_terra_hack         = 1000; // Roughly 16 seconds of holding the A button to bypass intro...
         myConfig.yOffset        = 9;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
@@ -1244,7 +1244,7 @@ void ApplyDatabaseTweaks(void)
 
     if (strstr(filename, "MULTI") && strstr(filename, "PLEX"))
     {
-        myConfig.frameSkip      = FS_NONE;
+        myConfig.frameSkip      = FS_LIGHT;
         myConfig.cpuBoost       = CPU_BOOST_FAST;
     }
     

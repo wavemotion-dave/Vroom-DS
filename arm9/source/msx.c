@@ -29,6 +29,8 @@
 #define SHADOW_SUB   (RAM_SIZE_KB-32)
 #define SHADOW_KANJI (RAM_SIZE_KB-16)
 
+#define DRAM_SHADOW     1
+
 // -------------------------------------------------------------
 // Some MSX Mapper / Slot Handling and sound generation stuff...
 // -------------------------------------------------------------
@@ -861,12 +863,14 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 0;
+#if DRAM_SHADOW // No DRAM Shadow for now
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[0] = RAM_Memory + (SHADOW_MAIN * 1024);
                     MemoryMap[1] = RAM_Memory + (SHADOW_MAIN * 1024);
                 }
                 else
+#endif                
                 {
                     MemoryMap[0] = TURBO_BIOS;
                     MemoryMap[1] = TURBO_BIOS;
@@ -897,12 +901,14 @@ void msx_slot_map_turboR(unsigned char Value)
             bRAMInPage[0] = 0;
             if (((msx_subslot3 & 0x03) >> 0) == 1) // Subslot 1 has Extended BIOS
             {
+#if DRAM_SHADOW // No DRAM Shadow for now
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[0] = RAM_Memory + (SHADOW_SUB * 1024);
                     MemoryMap[1] = RAM_Memory + (SHADOW_SUB * 1024);
                 }
                 else
+#endif                
                 {
                     MemoryMap[0] = (u8 *)TURBO_SUB;
                     MemoryMap[1] = (u8 *)TURBO_SUB;
@@ -930,12 +936,14 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
+#if DRAM_SHADOW // No DRAM Shadow for now                
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[2] = RAM_Memory + (SHADOW_MAIN * 1024);
                     MemoryMap[3] = RAM_Memory + (SHADOW_MAIN * 1024);
                 }
                 else
+#endif                
                 {
                     MemoryMap[2] = TURBO_BIOS;
                     MemoryMap[3] = TURBO_BIOS;
@@ -1005,8 +1013,18 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
-                MemoryMap[2] = (u8 *)TURBO_KANJI+0x0000 - 0x4000;
-                MemoryMap[3] = (u8 *)TURBO_KANJI+0x2000 - 0x6000;
+#if DRAM_SHADOW // No DRAM Shadow for now
+                if (s1990_reg6 == 0x00)
+                {
+                    MemoryMap[2] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
+                    MemoryMap[3] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
+                }
+                else
+#endif               
+                {
+                    MemoryMap[2] = (u8 *)TURBO_KANJI+0x0000 - 0x4000;
+                    MemoryMap[3] = (u8 *)TURBO_KANJI+0x2000 - 0x6000;
+                }
             }
             else if (((msx_subslot3 & 0x0C) >> 2) == 2) // Subslot 3-2 has the DOS mapper ROM
             {
@@ -1065,16 +1083,8 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[2] = 0;
                 bRAMInPage[2] = 0;
-                if (s1990_reg6 == 0x00)
-                {
-                    MemoryMap[2] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
-                    MemoryMap[3] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
-                }
-                else
-                {
-                    MemoryMap[4] = (u8 *)TURBO_KANJI+0x4000 - 0x8000;
-                    MemoryMap[5] = (u8 *)TURBO_KANJI+0x6000 - 0xA000;
-                }
+                MemoryMap[4] = (u8 *)TURBO_KANJI+0x4000 - 0x8000;
+                MemoryMap[5] = (u8 *)TURBO_KANJI+0x6000 - 0xA000;
             }
             else
             {

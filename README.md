@@ -65,6 +65,7 @@ Version 0.8 - 15-Nov-2026 by wavemotion-dave
 * A few more individual game tweaks for improved gameplay.
 * Minor bug fixes and cleanup as time permitted.
 * 0.8a with reworked CPU read/write memory handling for an almost 10% speedup!
+* 0.8b with direct write to VRAM for another 1-2 frames of performance. Fix for Stage 11 Kai.
 
 Version 0.7 - 15-Nov-2026 by wavemotion-dave
 * Real R800 timing and actual CPU context switching for improved accuracy.

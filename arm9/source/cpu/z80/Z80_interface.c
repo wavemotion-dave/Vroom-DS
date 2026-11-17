@@ -725,7 +725,6 @@ static MapperWriteHandler const mapperWriteHandlers[END_MAPPERS] __attribute__((
 // ---------------------------------------------------------------------
 ITCM_CODE void cpu_writemem16(u16 address, u8 value)
 {
-    debug[14]++;
     if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
         if (special_memory_access & SPEC_MEM_SUBSLOT0_ACTIVE) msx_subslot0 = value;
@@ -734,7 +733,6 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
     }
     else if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
     {
-        debug[15]++;
         MemoryMap[address>>13][address]=value;
     }
     else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF0) && (address <= 0x7FFF)) // Disk controller memory map... (including Turbo-R DOS 2.3 if enabled)

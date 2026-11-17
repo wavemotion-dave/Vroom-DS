@@ -511,7 +511,7 @@ void ResetMSX(void)
 
     sound_chip_reset(); // Reset the SN, AY and SCC chips
     
-    setup_emulation_BP8(); // Put us back to normal 8-bit mode
+    setup_emulation_NoBlend(); // Put us back to normal 8-bit mode
 
     Z80_Interface_Reset(); // Reset the Z80 Interface
     ResetZ80(&CPU);        // Reset the Z80 CPU core
@@ -1369,6 +1369,8 @@ void VroomDSRunEmu(void)
             {
                 ShowDebugZ80();
             }
+            
+            u8 old_blended = render_blended;
 
             // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
             if (ScrMode == 7)
@@ -1400,7 +1402,22 @@ void VroomDSRunEmu(void)
             if (myConfig.scaleScreen)
             {
                 render_blended = 1;
-            }            
+            }
+            
+            // ----------------------------
+            // If blending has changed...
+            // ----------------------------
+            if (old_blended != render_blended)
+            {
+                if (render_blended)
+                {
+                    setup_emulation_Blend();
+                }
+                else
+                {
+                    setup_emulation_NoBlend();
+                }
+            }
 
             // ---------------------------------------------------------------------------------
             // Hold the key press for a brief instant... some machines take longer than others
@@ -2016,15 +2033,42 @@ void restore_lcd(void)
 }
 
 
-void setup_emulation_BP8(void)
+void setup_emulation_NoBlend(void)
 {
     swiWaitForVBlank();
 
-    // -----------------------------------------------------------------
-    // Change graphic mode to initiate emulation.
-    // Here we can claim back 128K of VRAM which is otherwise unused
-    // but we can use it for fast memory swaps and look-up-tables.
-    // -----------------------------------------------------------------
+    videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE);   // start with BG2 only
+    vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
+    vramSetBankB(VRAM_B_MAIN_BG_0x06020000);
+
+    REG_BG2CNT = BG_BMP8_256x256 | BG_BMP_BASE(0);  // Bank A
+    REG_BG3CNT = BG_BMP8_256x256 | BG_BMP_BASE(8);  // Bank B
+
+    REG_BLDCNT = 0;   // no hardware blending, we alternate in time instead
+
+    REG_BG2PA = (1 << 8);
+    REG_BG2PB = 0;
+    REG_BG2PC = 0;
+    REG_BG2PD = (1 << 8);
+    REG_BG2X = 0;
+    REG_BG2Y = 0;
+
+    REG_BG3PA = (1 << 8);
+    REG_BG3PB = 0;
+    REG_BG3PC = 0;
+    REG_BG3PD = (1 << 8);
+    REG_BG3X = 0;
+    REG_BG3Y = 0;
+    
+    // Clear old tile/map data out of bank A and B. 
+    dmaFillWords(0, (void *)BG_BMP_RAM(0), 256 * 256 * 2);
+    dmaFillWords(0, (void *)BG_BMP_RAM(8), 256 * 256 * 2);
+}
+
+void setup_emulation_Blend(void)
+{
+    swiWaitForVBlank();
+
     videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
     vramSetBankA(VRAM_A_MAIN_BG_0x06000000); // Bank A starts at 0x06000000
     vramSetBankB(VRAM_B_MAIN_BG_0x06020000); // Bank B starts at 0x06020000
@@ -2180,6 +2224,8 @@ void VroomDSInitCPU(void)
 // some basic vSYNC timing so that we lock the DS screen updates
 // and the MSX screen updates to avoid tearing as much as possible.
 // -----------------------------------------------------------------
+u8 ready_to_flip=0;
+u8 flip_to = 0;
 ITCM_CODE void irqVBlank(void)
 {
     int ydyBG = 0x0100; // Default to no screen scale
@@ -2192,6 +2238,11 @@ ITCM_CODE void irqVBlank(void)
 
     if (!bMainMenuActive) // If main menu active, don't shift anything...
     {
+        if (ready_to_flip)
+        {
+            FlipScreenBuffer(flip_to);
+            ready_to_flip = 0;
+        }
         // ---------------------------------------------------------------------
         // Are we in 192 scanline mode? If so, we don't need ANY screen panning.
         // ---------------------------------------------------------------------
@@ -2608,48 +2659,24 @@ void msxInit(void)
 
     // Put up the proper bottom keyboard overlay/graphic
     BottomScreenKeypad();
-    
-    setup_emulation_BP8();
 
-    // -----------------------------------------------------------------
-    // Change graphic mode to initiate emulation.
-    // Here we can claim back 128K of VRAM which is otherwise unused
-    // but we can use it for fast memory swaps and look-up-tables.
-    // -----------------------------------------------------------------
-    videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
-    vramSetBankA(VRAM_A_MAIN_BG_0x06000000); // Bank A starts at 0x06000000
-    vramSetBankB(VRAM_B_MAIN_BG_0x06020000); // Bank B starts at 0x06020000
+    // Setup top screen for proper emulation display
+    setup_emulation_NoBlend();
 
-    REG_BG2CNT = BG_BMP8_256x256 | BG_BMP_BASE(0); // Uses Bank A
-    REG_BG3CNT = BG_BMP8_256x256 | BG_BMP_BASE(8); // Uses Bank B
-
-    // Alpha blending configuration
-    REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_DST_BG3;
-
-    // EVA = 8, EVB = 8 (50/50 blend)
-    REG_BLDALPHA = (8) | (8 << 8);
-
-    REG_BG2PA = (1 << 8);
-    REG_BG2PB = 0;
-    REG_BG2PC = 0;
-    REG_BG2PD = (1 << 8);
-    REG_BG2X = 0;
-    REG_BG2Y = 0;
-
-    REG_BG3PA = (1 << 8);
-    REG_BG3PB = 0;
-    REG_BG3PC = 0;
-    REG_BG3PD = (1 << 8);
-    REG_BG3X = 0;
-    REG_BG3Y = 0;
-
-    memset((u8 *)0x06000000, 0x00, 0x40000); // Ensure screen is clear... (LCD_A and LCD_B)    
-    
     // Wipe RAM area for the MSX
     msxWipeRAM();
 
     // Perform a standard system RESET
     ResetMSX();
+}
+
+void FlipScreenBuffer(u8 flip_buffer)
+{
+    if (!render_blended)
+    {
+        u32 d = REG_DISPCNT & ~(DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
+        REG_DISPCNT = d | (flip_buffer ? DISPLAY_BG3_ACTIVE : DISPLAY_BG2_ACTIVE);
+    }
 }
 
 /*********************************************************************************
@@ -2663,9 +2690,6 @@ void msxUpdateScreen(void)
     if (!skip_render)
     {
         overscan_trick = 0;
-        u32 *DS_LCD_VRAM = (u32*) DS_LCD_VRAM_1;
-        if (drawn_frame_number & render_blended) DS_LCD_VRAM = (u32*) DS_LCD_VRAM_2; // Blended will alpha blend VRAM_1 +  VRAM_2
-        dmaCopyWordsAsynch(2, (u32 *)XBuf[(drawn_frame_number + 1) & 1], (u32 *)DS_LCD_VRAM, 256*212);
     }
 
     skip_render = 0;

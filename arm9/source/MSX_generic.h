@@ -291,4 +291,8 @@ extern void Mouse_PollHost(void);
 extern void SCC_LegacyWrite(u8 value, u16 address);
 extern void msx_slot_map_turboR(unsigned char Value);
 extern void UpdateSpecialPages(void);
+extern void FlipScreenBuffer(u8 flip_buffer);
+extern void setup_emulation_Blend(void);
+extern void setup_emulation_NoBlend(void);
+
 #endif
