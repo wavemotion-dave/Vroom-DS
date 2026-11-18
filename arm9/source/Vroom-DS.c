@@ -102,6 +102,7 @@ u8 key_graph __attribute__((section(".dtcm"))) = false;
 u16 emuActFrames    __attribute__((section(".dtcm"))) = 0;  // Actual frames rendered - used for FPS calculation
 u16 timingFrames    __attribute__((section(".dtcm"))) = 0;  // This one will cycle 0-59 for the 60Hz refresh
 u8 render_blended   __attribute__((section(".dtcm"))) = 0;  // Set to 1 to alpha-blend using NDS hardware - useful for Screen 7 high-res
+u8 old_blended      __attribute__((section(".dtcm"))) = 99; // Set to 1 to alpha-blend using NDS hardware - useful for Screen 7 high-res
 u8 soundEmuPause    __attribute__((section(".dtcm"))) = 1;  // Set to 1 to pause (mute) sound, 0 is sound unmuted (sound channels active)
 
 u8 kbd_key          __attribute__((section(".dtcm"))) = 0;  // 0 if no key pressed, othewise the ASCII key (e.g. 'A', 'B', '3', etc)
@@ -550,6 +551,7 @@ void ResetMSX(void)
     sram_show_status = 0;
     flash_show_status = 0;
     render_blended = 0;
+    old_blended = 99;
 }
 
 //*********************************************************************************
@@ -1370,7 +1372,7 @@ void VroomDSRunEmu(void)
                 ShowDebugZ80();
             }
             
-            u8 old_blended = render_blended;
+            render_blended = 0; // Assume no blend... Checked directly below.
 
             // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
             if (ScrMode == 7)
@@ -1409,6 +1411,7 @@ void VroomDSRunEmu(void)
             // ----------------------------
             if (old_blended != render_blended)
             {
+                old_blended = render_blended;
                 if (render_blended)
                 {
                     setup_emulation_Blend();

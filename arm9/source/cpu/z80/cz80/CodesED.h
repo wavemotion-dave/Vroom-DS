@@ -1,10 +1,10 @@
 /******************************************************************************
-*  Hachibitto Z80 CPU 
+*  Hachibitto Z80 CPU  (R800 / Turbo-R optimized ED table)
 *
 * Note: Most of this file is from the ColEm emulator core by Marat Fayzullin
 *       but heavily modified for specific NDS use. If you want to use this
 *       code, you are advised to seek out the much more portable fMSX core
-*       and contact Marat.       
+*       and contact Marat.
 *
 ******************************************************************************/
 
@@ -21,6 +21,38 @@
 /**     changes to this file.                               **/
 /*************************************************************/
 
+/** Optimization notes ***************************************/
+/** - Repeat instructions (LDIR/LDDR/INIR/INDR/OTIR/OTDR/   **/
+/**   CPIR/CPDR) no longer touch F on every iteration; flags **/
+/**   are computed once, on the exit path. Exit values are   **/
+/**   unchanged from the original.                           **/
+/** - 16-bit immediate address fetch uses one PC update     **/
+/**   instead of two (M_FETCHW below).                       **/
+/** - Define R800_SIMPLE_IO_FLAGS to also drop the          **/
+/**   undocumented INI/IND/OUTI/OUTD/OTIR/OTDR/INIR/INDR    **/
+/**   flag work (N-from-data bit, HL.l+I carry). Off by      **/
+/**   default because it changes visible F results.          **/
+/*************************************************************/
+
+/* Fetch a 16-bit immediate into J.W with a single PC update.
+   (word) cast keeps the high-byte fetch wrapping at 0xFFFF. */
+#undef  M_FETCHW
+#define M_FETCHW(Jp) \
+  Jp.W = (word)(OpZ80(CPU.PC.W) | (OpZ80((word)(CPU.PC.W+1)) << 8)); \
+  CPU.PC.W += 2
+
+/* I/O block flag helpers. Z is the Z-flag term to merge in. */
+#undef  IO_IN_FLAGS
+#undef  IO_OUT_FLAGS
+#ifdef R800_SIMPLE_IO_FLAGS
+  #define IO_IN_FLAGS(Z)   ((CPU.AF.B.l&C_FLAG)|N_FLAG|(Z))
+  #define IO_OUT_FLAGS(Z)  ((CPU.AF.B.l&C_FLAG)|N_FLAG|(Z))
+#else
+  #define IO_IN_FLAGS(Z)   ((I&0x80 ? N_FLAG:0)|(Z))
+  #define IO_OUT_FLAGS(Z)  ((CPU.AF.B.l&S_FLAG)|(I&0x80 ? N_FLAG:0)|(Z)| \
+                            (CPU.HL.B.l+I>255 ? (C_FLAG|H_FLAG):0))
+#endif
+
 /** This is a special patch for emulating BIOS calls: ********/
 case DB_FE:     PatchZ80(&CPU);break;
 /*************************************************************/
@@ -36,51 +68,43 @@ case SBC_HL_HL: M_SBCW(HL);break;
 case SBC_HL_SP: M_SBCW(SP);break;
 
 case LD_xWORDe_HL:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   WrZ80f(J.W++,CPU.HL.B.l);
   WrZ80f(J.W,CPU.HL.B.h);
   break;
 case LD_xWORDe_DE:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   WrZ80f(J.W++,CPU.DE.B.l);
   WrZ80f(J.W,CPU.DE.B.h);
   break;
 case LD_xWORDe_BC:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   WrZ80f(J.W++,CPU.BC.B.l);
   WrZ80f(J.W,CPU.BC.B.h);
   break;
 case LD_xWORDe_SP:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   WrZ80f(J.W++,CPU.SP.B.l);
   WrZ80f(J.W,CPU.SP.B.h);
   break;
 
 case LD_HL_xWORDe:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   CPU.HL.B.l=RdZ80(J.W++);
   CPU.HL.B.h=RdZ80(J.W);
   break;
 case LD_DE_xWORDe:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   CPU.DE.B.l=RdZ80(J.W++);
   CPU.DE.B.h=RdZ80(J.W);
   break;
 case LD_BC_xWORDe:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   CPU.BC.B.l=RdZ80(J.W++);
   CPU.BC.B.h=RdZ80(J.W);
   break;
 case LD_SP_xWORDe:
-  J.B.l=OpZ80(CPU.PC.W++);
-  J.B.h=OpZ80(CPU.PC.W++);
+  M_FETCHW(J);
   CPU.SP.B.l=RdZ80(J.W++);
   CPU.SP.B.h=RdZ80(J.W);
   break;
@@ -141,80 +165,66 @@ case OUT_xC_L: OutZ80(CPU.BC.W,CPU.HL.B.l);break;
 case OUT_xC_A: OutZ80(CPU.BC.W,CPU.AF.B.h);break;
 case OUT_xC_F: OutZ80(CPU.BC.W,0);break;
 
+/** Block I/O: loop iterations leave F alone, exit path sets it **/
 case INI:
   I = InZ80(CPU.BC.W);
   WrZ80(CPU.HL.W++,I);
   --CPU.BC.B.h;
-  CPU.AF.B.l=(I&0x80 ? N_FLAG:0)|(CPU.BC.B.h? 0:Z_FLAG);
+  CPU.AF.B.l=IO_IN_FLAGS(CPU.BC.B.h? 0:Z_FLAG);
   break;
 
 case INIR:
   I = InZ80(CPU.BC.W);
   WrZ80(CPU.HL.W++,I);
-  if(--CPU.BC.B.h) { CPU.AF.B.l=N_FLAG; CPU.PC.W-=2; }   // N_FLAG is not correct here but will be corrected when loop exits below. Nothing relies on the intermediate value.
-  else            { CPU.AF.B.l=Z_FLAG|(I&0x80 ? N_FLAG:0); CPU.ICount+=CYCLES_REPEAT_EXIT; }
+  if(--CPU.BC.B.h) CPU.PC.W-=2;
+  else { CPU.AF.B.l=IO_IN_FLAGS(Z_FLAG); CPU.ICount+=CYCLES_REPEAT_EXIT; }
   break;
 
 case IND:
   I = InZ80(CPU.BC.W);
   WrZ80(CPU.HL.W--,I);
   --CPU.BC.B.h;
-  CPU.AF.B.l=(I&0x80 ? N_FLAG:0)|(CPU.BC.B.h? 0:Z_FLAG);
+  CPU.AF.B.l=IO_IN_FLAGS(CPU.BC.B.h? 0:Z_FLAG);
   break;
 
 case INDR:
   I = InZ80(CPU.BC.W);
   WrZ80(CPU.HL.W--,I);
-  if(--CPU.BC.B.h) { CPU.AF.B.l=N_FLAG; CPU.PC.W-=2; }   // repeat while B != 0
-  else             { CPU.AF.B.l=Z_FLAG|(I&0x80 ? N_FLAG:0); CPU.ICount+=CYCLES_REPEAT_EXIT; }
-  break;  
+  if(--CPU.BC.B.h) CPU.PC.W-=2;
+  else { CPU.AF.B.l=IO_IN_FLAGS(Z_FLAG); CPU.ICount+=CYCLES_REPEAT_EXIT; }
+  break;
 
 case OUTI:
   --CPU.BC.B.h;
   I=RdZ80(CPU.HL.W++);
   OutZ80(CPU.BC.W,I);
-  CPU.AF.B.l = (CPU.AF.B.l & S_FLAG) | (I&0x80 ? N_FLAG:0) | (CPU.BC.B.h ? 0 : Z_FLAG) | (CPU.HL.B.l + I > 255 ? (C_FLAG | H_FLAG) : 0);
+  CPU.AF.B.l=IO_OUT_FLAGS(CPU.BC.B.h? 0:Z_FLAG);
   break;
 
 case OTIR:
   --CPU.BC.B.h;
   I=RdZ80(CPU.HL.W++);
   OutZ80(CPU.BC.W,I);
-  if(CPU.BC.B.h)
-  {
-    CPU.AF.B.l=N_FLAG|(CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);  // N_FLAG is not correct here but will be corrected when loop exits below. Nothing relies on the intermediate value.
-    CPU.PC.W-=2;
-  }
-  else
-  {
-    CPU.AF.B.l=(CPU.AF.B.l & S_FLAG) | Z_FLAG | (I&0x80 ? N_FLAG:0) | (CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);
-    CPU.ICount+=CYCLES_REPEAT_EXIT;
-  }
+  if(CPU.BC.B.h) CPU.PC.W-=2;
+  else { CPU.AF.B.l=IO_OUT_FLAGS(Z_FLAG); CPU.ICount+=CYCLES_REPEAT_EXIT; }
   break;
 
 case OUTD:
   --CPU.BC.B.h;
   I=RdZ80(CPU.HL.W--);
   OutZ80(CPU.BC.W,I);
-  CPU.AF.B.l=(CPU.AF.B.l & S_FLAG) | (I&0x80 ? N_FLAG:0) | (CPU.BC.B.h? 0:Z_FLAG) | (CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);
+  CPU.AF.B.l=IO_OUT_FLAGS(CPU.BC.B.h? 0:Z_FLAG);
   break;
 
 case OTDR:
   --CPU.BC.B.h;
   I=RdZ80(CPU.HL.W--);
   OutZ80(CPU.BC.W,I);
-  if(CPU.BC.B.h)
-  {
-    CPU.AF.B.l=N_FLAG|(CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);  // N_FLAG is not correct here but will be corrected when loop exits below. Nothing relies on the intermediate value.
-    CPU.PC.W-=2;
-  }
-  else
-  {
-    CPU.AF.B.l=(CPU.AF.B.l & S_FLAG) | Z_FLAG | (I&0x80 ? N_FLAG:0) | (CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);
-    CPU.ICount+=CYCLES_REPEAT_EXIT;
-  }
+  if(CPU.BC.B.h) CPU.PC.W-=2;
+  else { CPU.AF.B.l=IO_OUT_FLAGS(Z_FLAG); CPU.ICount+=CYCLES_REPEAT_EXIT; }
   break;
 
+/** Block transfer ********************************************/
 case LDI:
   WrZ80(CPU.DE.W++,RdZ80(CPU.HL.W++));
   --CPU.BC.W;
@@ -223,16 +233,8 @@ case LDI:
 
 case LDIR:
   WrZ80(CPU.DE.W++,RdZ80(CPU.HL.W++));
-  if(--CPU.BC.W)
-  {
-    CPU.AF.B.l=(CPU.AF.B.l&~(H_FLAG|P_FLAG))|N_FLAG;
-    CPU.PC.W-=2;
-  }
-  else
-  {
-    CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG);
-    CPU.ICount+=CYCLES_BLOCK_EXIT;
-  }
+  if(--CPU.BC.W) CPU.PC.W-=2;
+  else { CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG); CPU.ICount+=CYCLES_BLOCK_EXIT; }
   break;
 
 case LDD:
@@ -243,19 +245,11 @@ case LDD:
 
 case LDDR:
   WrZ80(CPU.DE.W--,RdZ80(CPU.HL.W--));
-  CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG);
-  if(--CPU.BC.W)
-  {
-    CPU.AF.B.l=(CPU.AF.B.l&~(H_FLAG|P_FLAG))|N_FLAG;
-    CPU.PC.W-=2;
-  }
-  else
-  {
-    CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG);
-    CPU.ICount+=CYCLES_BLOCK_EXIT;
-  }
+  if(--CPU.BC.W) CPU.PC.W-=2;
+  else { CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG); CPU.ICount+=CYCLES_BLOCK_EXIT; }
   break;
 
+/** Block compare: flags computed only when the loop exits ****/
 case CPI:
   I=RdZ80(CPU.HL.W++);
   J.B.l=CPU.AF.B.h-I;
@@ -268,11 +262,15 @@ case CPI:
 case CPIR:
   I=RdZ80(CPU.HL.W++);
   J.B.l=CPU.AF.B.h-I;
-  if(--CPU.BC.W&&J.B.l) { CPU.PC.W-=2; } else CPU.ICount+=CYCLES_REPEAT_EXIT;
-  CPU.AF.B.l =
-    N_FLAG|(CPU.AF.B.l&C_FLAG)|ZSTable[J.B.l]|
-    ((CPU.AF.B.h^I^J.B.l)&H_FLAG)|(CPU.BC.W? P_FLAG:0);
-  break;  
+  if(--CPU.BC.W && J.B.l) CPU.PC.W-=2;
+  else
+  {
+    CPU.AF.B.l =
+      N_FLAG|(CPU.AF.B.l&C_FLAG)|ZSTable[J.B.l]|
+      ((CPU.AF.B.h^I^J.B.l)&H_FLAG)|(CPU.BC.W? P_FLAG:0);
+    CPU.ICount+=CYCLES_REPEAT_EXIT;
+  }
+  break;
 
 case CPD:
   I=RdZ80(CPU.HL.W--);
@@ -286,10 +284,14 @@ case CPD:
 case CPDR:
   I=RdZ80(CPU.HL.W--);
   J.B.l=CPU.AF.B.h-I;
-  if(--CPU.BC.W&&J.B.l) { CPU.PC.W-=2; } else CPU.ICount+=CYCLES_REPEAT_EXIT;
-  CPU.AF.B.l =
-    N_FLAG|(CPU.AF.B.l&C_FLAG)|ZSTable[J.B.l]|
-    ((CPU.AF.B.h^I^J.B.l)&H_FLAG)|(CPU.BC.W? P_FLAG:0);
+  if(--CPU.BC.W && J.B.l) CPU.PC.W-=2;
+  else
+  {
+    CPU.AF.B.l =
+      N_FLAG|(CPU.AF.B.l&C_FLAG)|ZSTable[J.B.l]|
+      ((CPU.AF.B.h^I^J.B.l)&H_FLAG)|(CPU.BC.W? P_FLAG:0);
+    CPU.ICount+=CYCLES_REPEAT_EXIT;
+  }
   break;
 
 /** R800 multiply instructions (MSX Turbo R) *****************/

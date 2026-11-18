@@ -1188,13 +1188,12 @@ void ApplyDatabaseTweaks(void)
         MapCursors();
     }
 
-    if (strstr(filename, "FRAY") && strstr(filename, "MAGICAL"))
+    if (strstr(filename, "FRAY") && (strstr(filename, "MAGICAL") || strstr(filename, "TR_EN")))
     {
         myConfig.fdc_driver     = FDC_WD;
         myConfig.frameSkip      = FS_LIGHT; // Needs blending
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.ymBalance      = YM_BAL_HIGH;
-        myConfig.fakeFMPAC      = 1;
         myConfig.pcm            = 1;
     }
 

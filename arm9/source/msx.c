@@ -33,11 +33,11 @@
 // -------------------------------------------------------------
 // Some MSX Mapper / Slot Handling and sound generation stuff...
 // -------------------------------------------------------------
-u8 bCartInPage[4]           __attribute__((section(".dtcm"))) = {0,0,0,0};
-u8 bRAMInPage[4]            __attribute__((section(".dtcm"))) = {0,0,0,0};
+u8 bCartInPage[4]           __attribute__((aligned(4))) __attribute__((section(".dtcm"))) = {0,0,0,0};
+u8 bRAMInPage[4]            __attribute__((aligned(4))) __attribute__((section(".dtcm"))) = {0,0,0,0};
 
-u8 *MSXCartPtr[2][8]        __attribute__((section(".dtcm"))) = { {0,0,0,0,0,0,0,0}, {0,0,0,0,0,0,0,0} };
-u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
+u8 *MSXCartPtr[2][8]        __attribute__((aligned(4))) __attribute__((section(".dtcm"))) = { {0,0,0,0,0,0,0,0}, {0,0,0,0,0,0,0,0} };
+u8 *MSXRamPtr[8]            __attribute__((aligned(4))) __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
 u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;      // True if game is making use of MSX-MUSIC (YM Sound)
 u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;      // True if game is making use of Konami SCC
@@ -709,107 +709,49 @@ __attribute__((noinline)) void read_joystick_or_mouse(void)
 // --------------------------------------------------------------------
 ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
 {
-#if 0
-    if (Port != 0x98 && Port != 0x99 && Port != 0xA2 && Port != 0xA9 && Port != 0xAA && Port != 0xE6 && Port != 0xA8)
-    {
-        //debug[DX++ & 0xF] = Port;
-        //debug[DX & 0xF] = 999999;
-        debug_printf("R %02X\n", Port);
-    }
-#endif
-  //98h~9Bh   Access to the VDP I/O ports.
-  if      (Port == 0x98) return RdData9938();               // VDP Data
-  else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
-  else if (Port == 0xB5) {return read_port_RTC_data();}     // RTC Data
-  else if (Port == 0xA2)  // PSG Read... might be joypad data
+  // These two are the most frequent so just handle them first...
+  if (Port == 0x98) return RdData9938();               // VDP Data
+  if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
+
+  switch (Port)
   {
-      // -------------------------------------------
-      // Only port 1 is used for the first Joystick
-      // -------------------------------------------
-      if (myAY.ayRegIndex == 14)
-      {
-          read_joystick_or_mouse();
-      }
-      else if (myAY.ayRegIndex == 15)
-      {
-          // When reading PORTB of the PSG, just echo back the last value written (the MSX BIOS needs this as it will preserve the KANA LED bit)
-          myAY.ayPortBIn = myAY.ayPortBOut;
-      }
+    case 0xA9: return readport_keyboard();
+    case 0xAA: return Port_PPI_C;
+    case 0xA8: return Port_PPI_A;
+
+    case 0xA2:  // PSG read... might be joypad data
+      if (myAY.ayRegIndex == 14)      read_joystick_or_mouse();
+      else if (myAY.ayRegIndex == 15) myAY.ayPortBIn = myAY.ayPortBOut;
       return ay38910DataR(&myAY);
-  }
-  else if (Port == 0xA8)  // Feedback on Slot mapping
-  {
-      return Port_PPI_A;
-  }
-  else if (Port == 0xA9)  // Keyboard read
-  {
-      return readport_keyboard();
-  }
-  else if (Port == 0xAA)  // Port C feedback
-  {
-      return Port_PPI_C;
-  }
-  else if (Port == 0xA7) // Turbo R Pause switch / R800 LED port
-  {
-    return 0x00;  // Pause switch released
-  }
-  else if (Port == 0xF4) // Turbo R Reset Status
-  {
-    return last_f4;
-  }
-  else if (Port >= 0xFC) // Mirror of RAM select. Not all MSX2 machine return this but we do.
-  {
-      return mirror_ram_bank[Port - 0xFC] | 0x80; // Upper bit always set
-  }
-  else if (Port >= 0xD8 && Port <= 0xDB) // Kanji Driver
-  {
+
+    case 0xE6: return turbo_timer & 0xFF;
+    case 0xE7: return (turbo_timer >> 8) & 0xFF;
+    case 0xE4: return s1990_reg_idx;
+    case 0xE5: return read_port_E5();
+    case 0xE9: return myConfig.MIDI;
+    case 0xA7: return 0x00;                            // Pause switch released
+    case 0xF4: return last_f4;
+    case 0xB5: return read_port_RTC_data();
+
+    case 0xD8: case 0xD9: case 0xDA: case 0xDB:
       return ReadPort_KanjiDriver(Port);
-  }
-  else if (Port == 0xE4)
-  {
-      return s1990_reg_idx;
-  }
-  else if (Port == 0xE5)
-  {
-      return read_port_E5();
-  }
-  else if (Port == 0xE6)
-  {
-      return turbo_timer & 0xFF;
-  }
-  else if (Port == 0xE7)
-  {
-      return (turbo_timer>>8) & 0xFF;
-  }
-  else if (Port == 0xE9) // MIDI - not used...
-  {
-      return myConfig.MIDI;
-  }
-  else if (Port == 0xA4)
-  {
-      return (pcm_counter & 3); // 2-bit free running counter...
-  }
-  else if (Port == 0xA5) // PCM status
-  {
-      byte comp = (0x80 >= pcm_last_a4) ? 0x80 : 0x00;  // pcm_dvalue = last byte written to A4h
-      return comp | (pcm_last_a5 & 0x1F);               // pcm_status = last byte written to A5h
-  }
-  else if (Port == 0xF3)
-  {
-      return ((VDP[0] >> 1) & 0x07) |
-       (VDP[1] & 0x18) |
-       (VDP[8] & 0x20) |
-       ((VDP[25] & 0x18) << 3);
-  }
-  else // Unknown port read
-  {
-      //debug[DX++ & 0xF] = Port;
-  }
 
-  // No such port
-  return(NORAM);
+    case 0xA4: return (pcm_counter & 3);
+    case 0xA5:
+    {
+      byte comp = (0x80 >= pcm_last_a4) ? 0x80 : 0x00;
+      return comp | (pcm_last_a5 & 0x1F);
+    }
+    case 0xF3:
+      return ((VDP[0] >> 1) & 0x07) | (VDP[1] & 0x18) |
+             (VDP[8] & 0x20) | ((VDP[25] & 0x18) << 3);
+
+    case 0xFC: case 0xFD: case 0xFE: case 0xFF:
+      return mirror_ram_bank[Port - 0xFC] | 0x80;     // Upper bits always set. In our case, we use all bits for paging except the top.
+
+    default: return NORAM;
+  }
 }
-
 
 // -----------------------------------------------------------------------------
 // To avoid calling the overhead of readmem16() and writemem16() we keep pages
@@ -853,23 +795,24 @@ void UpdateSpecialPages(void)
 }
 
 // ------------------------------------------------------------------------------
-// Slot map for this emulation roughly resembles the Panasonic A1GT machine but 
+// Slot map for this emulation roughly resembles the Panasonic A1GT machine but
 // without the Panasonic mapper in slot 3-3 and with the PAC-SRAM in slot 2.
+//
+// bCartInPage[]/bRAMInPage[] are cleared in bulk up front. Only the spots that
+// can be non-zero set them below.
 // ------------------------------------------------------------------------------
 void msx_slot_map_turboR(unsigned char Value)
 {
-    special_memory_access &= ~SPEC_MEM_SUBSLOT3_ACTIVE;  // Until proven otherwise below...
-    special_memory_access &= ~SPEC_MEM_SUBSLOT0_ACTIVE; // Until proven otherwise below...
-    special_memory_access &= ~SPEC_MEM_DISK_CONTROLLER;
-    special_memory_access &= ~SPEC_MEM_EXTDOS22;
+    special_memory_access &=  ~(SPEC_MEM_SUBSLOT3_ACTIVE | SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_DISK_CONTROLLER  | SPEC_MEM_EXTDOS22);
 
-    switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
+    memset(bCartInPage, 0, sizeof(bCartInPage));
+    memset(bRAMInPage,  0, sizeof(bRAMInPage));
+
+    switch (Value & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
-            if (((msx_subslot0 & 0x03) >> 0) == 0) // Subslot 0 has main ROM
+            if ((msx_subslot0 & 0x03) == 0) // Subslot 0 has main ROM
             {
-                bCartInPage[0] = 0;
-                bRAMInPage[0] = 0;
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[0] = RAM_Memory + (SHADOW_MAIN * 1024);
@@ -883,28 +826,22 @@ void msx_slot_map_turboR(unsigned char Value)
             }
             else
             {
-                bCartInPage[0] = 0;
-                bRAMInPage[0] = 0;
                 MemoryMap[0] = Unmapped_Memory - 0x0000;
                 MemoryMap[1] = Unmapped_Memory - 0x2000;
             }
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
-            bRAMInPage[0] = 0;
             MemoryMap[0] = (u8 *)(MSXCartPtr[MEDIA_CART1][0]) - 0x0000;
             MemoryMap[1] = (u8 *)(MSXCartPtr[MEDIA_CART1][1]) - 0x2000;
             break;
         case 0x02:  // Slot 2:  Secondary Cart Slot
             bCartInPage[0] = 2;
-            bRAMInPage[0] = 0;
             MemoryMap[0] = (u8 *)(MSXCartPtr[MEDIA_CART2][0]) - 0x0000;
             MemoryMap[1] = (u8 *)(MSXCartPtr[MEDIA_CART2][1]) - 0x2000;
             break;
         case 0x03:  // Slot 3:  This is an expanded slot... has Extended BIOS and Disk Controller ROMs
-            bCartInPage[0] = 0;
-            bRAMInPage[0] = 0;
-            if (((msx_subslot3 & 0x03) >> 0) == 1) // Subslot 1 has Extended BIOS
+            if ((msx_subslot3 & 0x03) == 1) // Subslot 1 has Extended BIOS
             {
                 if (s1990_reg6 == 0x00)
                 {
@@ -917,9 +854,8 @@ void msx_slot_map_turboR(unsigned char Value)
                     MemoryMap[1] = (u8 *)TURBO_SUB;
                 }
             }
-            else if (((msx_subslot3 & 0x03) >> 0) == 0) // Subslot 0 has RAM Mapper
+            else if ((msx_subslot3 & 0x03) == 0) // Subslot 0 has RAM Mapper
             {
-                bCartInPage[0] = 0;
                 bRAMInPage[0] = 1;
                 MemoryMap[0] = (u8 *)(MSXRamPtr[0]) - 0x0000;
                 MemoryMap[1] = (u8 *)(MSXRamPtr[1]) - 0x2000;
@@ -935,10 +871,10 @@ void msx_slot_map_turboR(unsigned char Value)
     switch ((Value>>2) & 0x03)  // Page 1 [0x4000~0x7FFF]
     {
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
-            if (((msx_subslot0 & 0x0C) >> 2) == 0) // Subslot 0-0 has main ROM
+        {
+            const u32 sub = (msx_subslot0 & 0x0C) >> 2;
+            if (sub == 0) // Subslot 0-0 has main ROM
             {
-                bCartInPage[1] = 0;
-                bRAMInPage[1] = 0;
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[2] = RAM_Memory + (SHADOW_MAIN * 1024);
@@ -950,10 +886,8 @@ void msx_slot_map_turboR(unsigned char Value)
                     MemoryMap[3] = TURBO_BIOS;
                 }
             }
-            else if (((msx_subslot0 & 0x0C) >> 2) == 1) // Subslot 0-1 FDC Disk Driver
+            else if (sub == 1) // Subslot 0-1 FDC Disk Driver
             {
-                bCartInPage[1] = 0;
-                bRAMInPage[1] = 0;
                 if (myConfig.fdc_driver == 0) // WD-2973 FDC driver
                 {
                     special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
@@ -966,54 +900,39 @@ void msx_slot_map_turboR(unsigned char Value)
                     MemoryMap[3] = (u8 *)Unmapped_Memory - 0x6000;
                 }
             }
-            else if (((msx_subslot0 & 0x0C) >> 2) == 2) // Subslot 0-2 has MSX-MUSIC
+            else if (sub == 2) // Subslot 0-2 has MSX-MUSIC
             {
-                bCartInPage[1] = 0;
-                bRAMInPage[1] = 0;
                 MemoryMap[2] = TURBO_MSXMUSIC + 0x0000 - 0x4000;
                 MemoryMap[3] = TURBO_MSXMUSIC + 0x2000 - 0x6000;
             }
-            else if (((msx_subslot0 & 0x0C) >> 2) == 3) // Subslot 0-3 has Opening ROM
+            else // Subslot 0-3 has Opening ROM
             {
-                bCartInPage[1] = 0;
-                bRAMInPage[1] = 0;
                 MemoryMap[2] = TURBO_OPENING + 0x0000 - 0x4000;
                 MemoryMap[3] = TURBO_OPENING + 0x2000 - 0x6000;
             }
-            else
-            {
-                bCartInPage[1] = 0;
-                bRAMInPage[1] = 0;
-                MemoryMap[2] = Unmapped_Memory - 0x4000;
-                MemoryMap[3] = Unmapped_Memory - 0x6000;
-            }
             break;
+        }
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
-            bRAMInPage[1] = 0;
             MemoryMap[2] = (u8 *)(MSXCartPtr[MEDIA_CART1][2]) - 0x4000;
             MemoryMap[3] = (u8 *)(MSXCartPtr[MEDIA_CART1][3]) - 0x6000;
             break;
         case 0x02:  // Slot 2:  Secondary Cart Slot
             bCartInPage[1] = 2;
-            bRAMInPage[1] = 0;
             MemoryMap[2] = (u8 *)(MSXCartPtr[MEDIA_CART2][2]) - 0x4000;
             MemoryMap[3] = (u8 *)(MSXCartPtr[MEDIA_CART2][3]) - 0x6000;
             break;
         case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
-            bCartInPage[1] = 0;
-            bRAMInPage[1] = 0;
-            if (((msx_subslot3 & 0x0C) >> 2) == 0) // Subslot 3-0 has RAM Mapper
+        {
+            const u32 sub = (msx_subslot3 & 0x0C) >> 2;
+            if (sub == 0) // Subslot 3-0 has RAM Mapper
             {
-                bCartInPage[1] = 0;
                 bRAMInPage[1] = 1;
                 MemoryMap[2] = (u8 *)(MSXRamPtr[2]) - 0x4000;
                 MemoryMap[3] = (u8 *)(MSXRamPtr[3]) - 0x6000;
             }
-            else if (((msx_subslot3 & 0x0C) >> 2) == 1) // Subslot 3-1 has Kanji
+            else if (sub == 1) // Subslot 3-1 has Kanji
             {
-                bCartInPage[1] = 0;
-                bRAMInPage[1] = 0;
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[2] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
@@ -1025,233 +944,172 @@ void msx_slot_map_turboR(unsigned char Value)
                     MemoryMap[3] = (u8 *)TURBO_KANJI+0x2000 - 0x6000;
                 }
             }
-            else if (((msx_subslot3 & 0x0C) >> 2) == 2) // Subslot 3-2 has the DOS mapper ROM
+            else if (sub == 2 && msx_dos22) // Subslot 3-2 has the DOS mapper ROM
             {
-                bCartInPage[1] = 0;
-                bRAMInPage[1] = 0;
-                if (msx_dos22)
-                {
-                    u8 *dos_rom = (myConfig.fdc_driver == 1) ? TURBO_DOS23 : TURBO_DOS22;
-                    special_memory_access |= (myConfig.fdc_driver == 1) ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_EXTDOS22;
-                    MemoryMap[2] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
-                    MemoryMap[3] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
-                }
-                else
-                {
-                    MemoryMap[2] = Unmapped_Memory - 0x4000;
-                    MemoryMap[3] = Unmapped_Memory - 0x6000;
-                }
+                u8 *dos_rom = (myConfig.fdc_driver == 1) ? TURBO_DOS23 : TURBO_DOS22;
+                special_memory_access |= (myConfig.fdc_driver == 1) ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_EXTDOS22;
+                MemoryMap[2] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
+                MemoryMap[3] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
             }
-            else // Other subslots have nothing in this page
+            else // Subslot 3-2 without DOS 2.2, or subslot 3-3: nothing in this page
             {
                 MemoryMap[2] = Unmapped_Memory - 0x4000;
                 MemoryMap[3] = Unmapped_Memory - 0x6000;
             }
             break;
+        }
     }
 
     switch ((Value>>4) & 0x03)  // Page 2 [0x8000~0xBFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
-            bCartInPage[2] = 0;
-            bRAMInPage[2] = 0;
             MemoryMap[4] = Unmapped_Memory - 0x8000;
             MemoryMap[5] = Unmapped_Memory - 0xA000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[2] = 1;
-            bRAMInPage[2] = 0;
             MemoryMap[4] = (u8 *)(MSXCartPtr[MEDIA_CART1][4]) - 0x8000;
             MemoryMap[5] = (u8 *)(MSXCartPtr[MEDIA_CART1][5]) - 0xA000;
             break;
         case 0x02:  // Slot 2:  Secondary Cart Slot
             bCartInPage[2] = 2;
-            bRAMInPage[2] = 0;
             MemoryMap[4] = (u8 *)(MSXCartPtr[MEDIA_CART2][4]) - 0x8000;
             MemoryMap[5] = (u8 *)(MSXCartPtr[MEDIA_CART2][5]) - 0xA000;
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
-            if (((msx_subslot3 & 0x30) >> 4) == 0) // Subslot 3-0 has RAM Mapper
+        case 0x03:  // Slot 3:  Expanded slot
+        {
+            const u32 sub = (msx_subslot3 & 0x30) >> 4;
+            if (sub == 0) // Subslot 3-0 has RAM Mapper
             {
-                bCartInPage[2] = 0;
                 bRAMInPage[2] = 1;
                 MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
                 MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
             }
-            else if (((msx_subslot3 & 0x30) >> 4) == 1) // Subslot 3-1 has Kanji
+            else if (sub == 1) // Subslot 3-1 has Kanji
             {
-                bCartInPage[2] = 0;
-                bRAMInPage[2] = 0;
                 MemoryMap[4] = (u8 *)TURBO_KANJI+0x4000 - 0x8000;
                 MemoryMap[5] = (u8 *)TURBO_KANJI+0x6000 - 0xA000;
             }
             else
             {
-                bCartInPage[2] = 0;
-                bRAMInPage[2] = 0;
                 MemoryMap[4] = Unmapped_Memory - 0x8000;
                 MemoryMap[5] = Unmapped_Memory - 0xA000;
             }
             break;
+        }
     }
 
     switch ((Value>>6) & 0x03)  // Page 3 [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             special_memory_access |= SPEC_MEM_SUBSLOT0_ACTIVE; // Opens up 0xFFFF
-            bCartInPage[3] = 0;
-            bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory - 0xC000;
             MemoryMap[7] = Unmapped_Memory - 0xE000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[3] = 1;
-            bRAMInPage[3] = 0;
             MemoryMap[6] = (u8 *)(MSXCartPtr[MEDIA_CART1][6]) - 0xC000;
             MemoryMap[7] = (u8 *)(MSXCartPtr[MEDIA_CART1][7]) - 0xE000;
             break;
         case 0x02:  // Slot 2:  Secondary Cart Slot
             bCartInPage[3] = 2;
-            bRAMInPage[3] = 0;
             MemoryMap[6] = (u8 *)(MSXCartPtr[MEDIA_CART2][6]) - 0xC000;
             MemoryMap[7] = (u8 *)(MSXCartPtr[MEDIA_CART2][7]) - 0xE000;
             break;
         case 0x03:  // Slot 3: Expanded
             special_memory_access |= SPEC_MEM_SUBSLOT3_ACTIVE; // Opens up 0xFFFF
-            if (((msx_subslot3 & 0xC0) >> 6) == 0) // Subslot 3-0 has RAM Mapper
+            if ((msx_subslot3 & 0xC0) == 0) // Subslot 3-0 has RAM Mapper
             {
-                bCartInPage[3] = 0;
                 bRAMInPage[3] = 1;
                 MemoryMap[6] = (u8 *)(MSXRamPtr[6]) - 0xC000;
                 MemoryMap[7] = (u8 *)(MSXRamPtr[7]) - 0xE000;
             }
             else // Other subslots have nothing mapped in...
             {
-                bCartInPage[3] = 0;
-                bRAMInPage[3] = 0;
                 MemoryMap[6] = Unmapped_Memory - 0xC000;
                 MemoryMap[7] = Unmapped_Memory - 0xE000;
             }
             break;
     }
-    
+
     UpdateSpecialPages();
 }
 
 // -----------------------------------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip, Disk I/O, MSX2 Expanded Memory plus Slot Mapper $A8
 // -----------------------------------------------------------------------------------------------
-ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
+ITCM_CODE __attribute__((optimize("no-jump-tables")))
+void cpu_writeport_msx(register u8 Port,register unsigned char Value)
 {
     static u8 msx_music_register = 0;
 
-#if 0
-    if (Port != 0x98 && Port != 0x99 && Port != 0xA2 && Port != 0xA9 && Port != 0xAA && Port != 0xE6 && Port != 0xA8)
+    if      (Port == 0x98) WrData9938(Value);                  // VDP Data
+    else if (Port == 0x99) WrCtrl9938(Value);                  // VDP Control
+    else switch (Port)
     {
-        //debug[DX++ & 0xF] = Port;
-        //debug[DX & 0xF] = 999999;
-        debug_printf("W %02X=%02X\n", Port, Value);
-    }
-#endif
+        case 0x9A: write_port_palette(Value); break;
+        case 0x9B: IndirectRegWrite9938(Value); break;
+        case 0xA0: ay38910IndexW(Value&0xF, &myAY); break;
+        case 0xA1:
+            ay38910DataW(Value, &myAY);
+            if (myAY.ayRegIndex == 15) Mouse_WritePortB(myAY.ayPortBOut, CurLine);
+            break;
 
-    if      (Port == 0x98) {WrData9938(Value);}                 // VDP Data
-    else if (Port == 0x99) {WrCtrl9938(Value);}                 // VDP Control
-    else if (Port == 0x9A) {write_port_palette(Value);}         // VDP Palette
-    else if (Port == 0x9B) {IndirectRegWrite9938(Value);}       // Indirect Register Area
-    else if (Port == 0xA0) {ay38910IndexW(Value&0xF, &myAY);}   // PSG Area
-    else if (Port == 0xA1) {ay38910DataW(Value, &myAY); if (myAY.ayRegIndex == 15) Mouse_WritePortB(myAY.ayPortBOut, CurLine);}        // PSG Area
-    else if (Port == 0xB4) {write_port_RTC_index(Value);}       // RTC Area (index register)
-    else if (Port == 0xB5) {write_port_RTC_data(Value);}        // RTC Area (data register)
-    else if (Port == 0xF4) {last_f4 = Value;}
-    else if (Port == 0xE4) // S1990 register index
-    {
-        s1990_reg_idx = Value & 0xF;
-    }
-    else if (Port == 0xE5) // S1990 register access
-    {
-        write_port_E5(Value);
-    }
-    else if (Port == 0xE6) // Reset the Turbo-R timer
-    {
-        turbo_timer = 0;
-    }
-    else if (Port == 0xE7) // Reset the Turbo-R timer
-    {
-        turbo_timer = 0;
-    }
-    else if (Port == 0xA4) // PCM
-    {
-        pcm_last_a4 = Value;
-        pcm_counter = 0x00;
-    }
-    else if (Port == 0xA5) // PCM
-    {
-        pcm_last_a5 = Value;
-    }
-    else if (Port == 0xA8) // Slot system for MSX
-    {
-        msx_slot_map_turboR(Value);
-        Port_PPI_A = Value;
-    }
-    else if (Port == 0xA9)  // PPI - Register B
-    {
-        Port_PPI_B = Value;
-    }
-    else if (Port == 0xAA)  // PPI - Register C
-    {
-        Port_PPI_C = Value;
-        msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
-    }
-    else if (Port == 0xAB)  // PPI - Register C Fast Modify
-    {
-        // Set or clear the proper bit in PORTC
-        u8 bit =  (Value & 0x0E) >> 1;
-        if (Value & 1) Port_PPI_C |= (1 << bit);
-        else Port_PPI_C &= ~(1 << bit);
-
-        msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
-    }
-    else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
-    {
-        u8 page = Port-0xFC;
-        
-        u8 bank = Value & ((RAM_SIZE_KB / 16) - 1); // 2048K is 16K in 128 banks
-
-        mirror_ram_bank[page] = bank; // For read-back
-
-        MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
-        MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
-
-        cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
-    }
-    else if (Port == 0x41)
-    {
-        last_port_41 = Value;
-    }
-    else if (Port == 0x7C)
-    {
-        msx_music_register = Value;
-    }
-    else if (Port == 0x7D)
-    {
-        if (++msx_music_writes == 10) // Arbitrary... if we hit it at least 10 times, we turn on MSX MUSIC output
+        case 0xA8: msx_slot_map_turboR(Value); Port_PPI_A = Value; break;
+        case 0xA9: Port_PPI_B = Value; break;
+        case 0xAA:
+            Port_PPI_C = Value;
+            msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
+            break;
+        case 0xAB:
         {
-            msx_music_capable_game = 1;
-            bClickRemoveNeeded = 5;
+            u8 bit = (Value & 0x0E) >> 1;
+            if (Value & 1) Port_PPI_C |= (1 << bit);
+            else           Port_PPI_C &= ~(1 << bit);
+            msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
+            break;
         }
 
-        YMWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
+        case 0xE6: case 0xE7: turbo_timer = 0; break;
+        case 0xE4: s1990_reg_idx = Value & 0xF; break;
+        case 0xE5: write_port_E5(Value); break;
+        case 0xF4: last_f4 = Value; break;
+        case 0xA4: pcm_last_a4 = Value; pcm_counter = 0x00; break;
+        case 0xA5: pcm_last_a5 = Value; break;
+
+        case 0xB4: write_port_RTC_index(Value); break;
+        case 0xB5: write_port_RTC_data(Value); break;
+
+        case 0xFC: case 0xFD: case 0xFE: case 0xFF:
+        {
+            u8 page = Port-0xFC;
+            u8 bank = Value & ((RAM_SIZE_KB / 16) - 1);
+            mirror_ram_bank[page] = bank;
+            MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
+            MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
+            msx_slot_map_turboR(Port_PPI_A);   // Enable the new map
+            break;
+        }
+
+        case 0x41: last_port_41 = Value; break;
+        case 0x7C: msx_music_register = Value; break;
+        case 0x7D:
+            if (++msx_music_writes == 10)
+            {
+                msx_music_capable_game = 1;
+                bClickRemoveNeeded = 5;
+            }
+            YMWrite(Value, msx_music_register, &myYM);
+            break;
+
+        case 0xD8: case 0xD9: case 0xDA: case 0xDB:
+            WritePort_KanjiDriver(Port, Value);
+            break;
+
+        default: break;
     }
-    else if (Port >= 0xD8 && Port <= 0xDB)
-    {
-        WritePort_KanjiDriver(Port, Value);
-    }
-    else // Unhandled port write...
-    {
-        //debug[DX++ & 0xF] = Port;
-    }
-    
-    last_port_write = Port;    
+
+    last_port_write = Port;
 }
 
 // --------------------------------------------------------------------------

@@ -195,31 +195,33 @@ inline void WrZ80fast(word A, byte V)
   CPU.AF.B.l= (CPU.AF.B.l&C_FLAG)|ZSTable_DEC[Rg];
 
 #define M_ADDW(Rg1,Rg2) \
-  J.W=(CPU.Rg1.W+CPU.Rg2.W)&0xFFFF;                        \
-  CPU.AF.B.l=                                             \
-    (CPU.AF.B.l&~(H_FLAG|N_FLAG|C_FLAG))|                 \
-    ((CPU.Rg1.W^CPU.Rg2.W^J.W)&0x1000? H_FLAG:0)| (J.B.h & 0x28)| \
-    (((long)CPU.Rg1.W+(long)CPU.Rg2.W)&0x10000? C_FLAG:0); \
-  CPU.Rg1.W=J.W
+  { u32 R_ = (u32)CPU.Rg1.W + CPU.Rg2.W;                        \
+    CPU.AF.B.l = (CPU.AF.B.l & ~(H_FLAG|N_FLAG|C_FLAG))         \
+               | (((CPU.Rg1.W ^ CPU.Rg2.W ^ R_) >> 8) & H_FLAG) \
+               | (R_ >> 16);                                    \
+    CPU.Rg1.W = (word)R_; }
 
-#define M_ADCW(Rg)      \
-  I=CPU.AF.B.l&C_FLAG;J.W=(CPU.HL.W+CPU.Rg.W+I)&0xFFFF;           \
-  CPU.AF.B.l=                                                   \
-    (((long)CPU.HL.W+(long)CPU.Rg.W+(long)I)&0x10000? C_FLAG:0)| \
-    (~(CPU.HL.W^CPU.Rg.W)&(CPU.Rg.W^J.W)&0x8000? V_FLAG:0)|       \
-    ((CPU.HL.W^CPU.Rg.W^J.W)&0x1000? H_FLAG:0)| (J.B.h & 0x28)| \
-    (J.W? 0:Z_FLAG)|(J.B.h&S_FLAG);                            \
-  CPU.HL.W=J.W
+#define M_ADCW(Rg) \
+  { u32 A_ = CPU.HL.W, B_ = CPU.Rg.W;                           \
+    u32 R_ = A_ + B_ + (CPU.AF.B.l & C_FLAG);                   \
+    word W_ = (word)R_;                                         \
+    CPU.AF.B.l = (R_ >> 16)                                     \
+               | ((((~(A_ ^ B_)) & (B_ ^ W_)) >> 13) & V_FLAG)  \
+               | (((A_ ^ B_ ^ W_) >> 8) & H_FLAG)               \
+               | (W_ ? 0 : Z_FLAG)                              \
+               | ((W_ >> 8) & S_FLAG);                          \
+    CPU.HL.W = W_; }
 
-#define M_SBCW(Rg)      \
-  I=CPU.AF.B.l&C_FLAG;J.W=(CPU.HL.W-CPU.Rg.W-I)&0xFFFF;           \
-  CPU.AF.B.l=                                                   \
-    N_FLAG|                                                    \
-    (((long)CPU.HL.W-(long)CPU.Rg.W-(long)I)&0x10000? C_FLAG:0)| \
-    ((CPU.HL.W^CPU.Rg.W)&(CPU.HL.W^J.W)&0x8000? V_FLAG:0)|        \
-    ((CPU.HL.W^CPU.Rg.W^J.W)&0x1000? H_FLAG:0)| (J.B.h & 0x28)| \
-    (J.W? 0:Z_FLAG)|(J.B.h&S_FLAG);                            \
-  CPU.HL.W=J.W
+#define M_SBCW(Rg) \
+  { u32 A_ = CPU.HL.W, B_ = CPU.Rg.W;                           \
+    u32 R_ = A_ - B_ - (CPU.AF.B.l & C_FLAG);                   \
+    word W_ = (word)R_;                                         \
+    CPU.AF.B.l = N_FLAG | ((R_ >> 16) & C_FLAG)                 \
+               | ((((A_ ^ B_) & (A_ ^ W_)) >> 13) & V_FLAG)     \
+               | (((A_ ^ B_ ^ W_) >> 8) & H_FLAG)               \
+               | (W_ ? 0 : Z_FLAG)                              \
+               | ((W_ >> 8) & S_FLAG);                          \
+    CPU.HL.W = W_; }
 
 #define M_MULUB(Rg)                                              \
   CPU.HL.W = (word)CPU.AF.B.h * (byte)(Rg);                      \
@@ -714,10 +716,6 @@ ITCM_CODE int ExecR800(register int RunCycles)
 #define CYCLES_RET_TAKEN 2
 #undef WrZ80f
 #define WrZ80f WrZ80fast
-#undef M_PUSH
-#define M_PUSH(Rg)  WrZ80f(--CPU.SP.W,CPU.Rg.B.h);WrZ80f(--CPU.SP.W,CPU.Rg.B.l)
-#undef M_RST
-#define M_RST(Ad)   WrZ80f(--CPU.SP.W,CPU.PC.B.h);WrZ80f(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
 #include "Codes.h"
 #undef CYCLES_JR_NOT_TAKEN
 #undef CYCLES_CALL_TAKEN

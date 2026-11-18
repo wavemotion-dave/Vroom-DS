@@ -2741,8 +2741,6 @@ ITCM_CODE void RefreshLine8_HScroll(u8 uY, u8 *P, u32 sourceAddress)
 
     if (VDP[25] & 0x02)                            // MSK: blank leftmost 8 pixels
         memset(P, BORDER_COLOR_SCREEN8, 8);
-
-    if ((VDP[25] & 0x08) && uY > 128) DC_FlushRange(P, 256);
 }
 
 ITCM_CODE void RefreshLine8(u8 uY)
@@ -2755,21 +2753,7 @@ ITCM_CODE void RefreshLine8(u8 uY)
     }
     else
     {
-        if ((VDP[25] & 0x08) && (timingFrames & 1))
-        {
-            if (myConfig.frameSkip == 0)
-            {
-                // --------------------------------------------------------------------------------
-                // Screen 10/11/12 is a bit too much for this emulation. Fortunately this is mainly
-                // used for static screen images / in-game pictures so we can safely 50% frameskip.
-                // --------------------------------------------------------------------------------
-                skip_render = 1;
-                return;
-            }
-        }
-
-        u8 HasSprites = DoesScreen8LineHaveSprites(uY); // Sprite rendering on Screen 8 is expensive...
-        if (HAdjust) HasSprites = 1;                    // Any horizontal adjust and we must do the expensive processing
+        u8 HasSprites = 1;  // Force the memcpy() as direct rendering causes glitches
 
         uint8_t *P;
         if (!HasSprites) P = (u8 *)(XBuf[drawn_frame_number&1] + ((u16)uY << 8));
@@ -2811,8 +2795,6 @@ ITCM_CODE void RefreshLine8(u8 uY)
                     Screen10_Line_InPlace(P);  // YJK + YAE
                 else
                     Screen12_Line_InPlace(P);  // Pure YJK
-
-                if (uY > 128) DC_FlushRange(P, 256);
             }
         }   // <-- end of the HScroll8 / normal split
 

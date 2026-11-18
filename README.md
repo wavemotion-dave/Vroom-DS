@@ -59,6 +59,11 @@ Known Issues :
 
 Version History :
 -----------------------
+Version 0.9 - 18-Nov-2026 by wavemotion-dave
+* Absolute max optimization of CPU read/write throughput. We now sacrifice VDP speed for CPU speed since on the turbo-R that's the bottleneck.
+* Fix for a few turbo-R games that were not running at the optimal settings.
+* Direct screen render improved.
+
 Version 0.8 - 15-Nov-2026 by wavemotion-dave
 * Added real DRAM mode handling for BIOS shadow.
 * Improved audio output - AY now centers at zero. Clicks gone.

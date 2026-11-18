@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 512
-#define CONFIG_VER                  0x0006
+#define CONFIG_VER                  0x0007
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -37,7 +37,6 @@
 #define DPAD_SLIDE_N_GLIDE          3
 
 #define OVL_FULLKBD                 0
-#define OVL_ALPHAKBD                1
 
 typedef struct {
   char szName[MAX_FILE_NAME_LEN+1];
