@@ -82,7 +82,7 @@ struct __attribute__((__packed__)) Config_t
     u8  MIDI;
     u8  pcm;
     u8  fakeFMPAC;
-    u8  reserved1;
+    u8  splitRefresh;
     u8  reserved2;
     u8  reserved3;
     u8  reserved4;

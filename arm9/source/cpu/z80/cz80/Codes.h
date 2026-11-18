@@ -274,7 +274,7 @@ case LD_E_B:   CPU.DE.B.l=CPU.BC.B.h;break;
 case LD_H_B:   CPU.HL.B.h=CPU.BC.B.h;break;
 case LD_L_B:   CPU.HL.B.l=CPU.BC.B.h;break;
 case LD_A_B:   CPU.AF.B.h=CPU.BC.B.h;break;
-case LD_xHL_B: WrZ80(CPU.HL.W,CPU.BC.B.h);break;
+case LD_xHL_B: WrZ80f(CPU.HL.W,CPU.BC.B.h);break;
 
 case LD_B_C:   CPU.BC.B.h=CPU.BC.B.l;break;
 case LD_C_C:   CPU.BC.B.l=CPU.BC.B.l;break;

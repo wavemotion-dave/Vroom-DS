@@ -21,9 +21,10 @@
 
 #define DEBUG_REFRESH(x) //debug[x]++;
 
-#define R800_VDP_ACCESS_WAIT 20
-
-// Declare XBuf as 2 pointers, each pointing to a 256-byte row
+// -------------------------------------------------------------------------
+// XBuf as 2 pointers, each pointing to a 256-byte row of actual VRAM.
+// We direct render to try and squeeze out as much performance as possible.
+// -------------------------------------------------------------------------
 u8 *XBuf[2] = {(u8 *)0x06000000, (u8 *)0x06020000};
 
 static __attribute__((noinline)) void ApplyLeftMask(void);
@@ -3359,7 +3360,14 @@ ITCM_CODE byte RdCtrl9938(void)
 void RefereshPreviousLine(void)
 {
     int refresh_line = CurLine-1;
-    if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
+    if (myConfig.splitRefresh == 2)
+    {
+        if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
+    }
+    if (myConfig.splitRefresh)
+    {
+        if ((CurLine >= VDP9938_START_LINE) && (CurLine < VDP9938_END_LINE)) RefreshLine(CurLine - VDP9938_START_LINE);
+    }
 }
 
 /** Loop9938() ***********************************************/

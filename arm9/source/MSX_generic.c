@@ -1026,7 +1026,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
     {
         zone_terra_hack         = 1000; // Roughly 16 seconds of holding the A button to bypass intro...
-        myConfig.yOffset        = 9;
+        myConfig.yOffset        = 13;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.fdc_driver     = FDC_WD;
@@ -1239,12 +1239,12 @@ void ApplyDatabaseTweaks(void)
         myConfig.fdc_driver     = FDC_WD;
         myConfig.cpuBoost       = CPU_BOOST_FAST;
         myConfig.ymBalance      = YM_BAL_HIGH;
-        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.frameSkip      = FS_LIGHT;
     }
 
     if (strstr(filename, "MULTI") && strstr(filename, "PLEX"))
     {
-        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.frameSkip      = FS_NONE;
         myConfig.cpuBoost       = CPU_BOOST_FAST;
     }
     
@@ -1330,12 +1330,14 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.frameSkip      = FS_NONE;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
+        myConfig.splitRefresh   = 2;
     }
 
     if (strstr(filename, "NEMESIS") && strstr(filename, "ENHANCE"))
     {
         myConfig.frameSkip      = FS_NONE;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
+        myConfig.splitRefresh   = 2;
     }
 }
 
@@ -1369,7 +1371,7 @@ void SetDefaultGameConfig(void)
     myConfig.MIDI = 0x05;                       // MIDI idle. Some games want 0xFF.
     myConfig.pcm = 0;                           // No PCM support by default (it's CPU intensive)
     myConfig.fakeFMPAC = 0;                     // No fake FM-PAC support (a few games need it)
-    myConfig.reserved1 = 0;
+    myConfig.splitRefresh = 0;                  // No split refresh unless game needs it
     myConfig.reserved2 = 0;
     myConfig.reserved3 = 0;
     myConfig.reserved4 = 0;

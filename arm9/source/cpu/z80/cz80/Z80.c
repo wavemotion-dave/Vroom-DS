@@ -121,11 +121,11 @@ inline void WrZ80fast(word A, byte V)
 #define M_POP(Rg)      \
   CPU.Rg.B.l=OpZ80(CPU.SP.W++);CPU.Rg.B.h=OpZ80(CPU.SP.W++)
 #define M_PUSH(Rg)     \
-  WrZ80(--CPU.SP.W,CPU.Rg.B.h);WrZ80(--CPU.SP.W,CPU.Rg.B.l)
+  WrZ80f(--CPU.SP.W,CPU.Rg.B.h);WrZ80f(--CPU.SP.W,CPU.Rg.B.l)
 
 #define M_CALL         \
   J.B.l=OpZ80(CPU.PC.W++);J.B.h=OpZ80(CPU.PC.W++);         \
-  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80(--CPU.SP.W,CPU.PC.B.l); \
+  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80f(--CPU.SP.W,CPU.PC.B.l); \
   CPU.PC.W=J.W; \
   JumpZ80(J.W)
 
@@ -134,7 +134,7 @@ inline void WrZ80fast(word A, byte V)
 #define M_RET CPU.PC.B.l=OpZ80(CPU.SP.W++);CPU.PC.B.h=OpZ80(CPU.SP.W++);JumpZ80(CPU.PC.W)
 
 #define M_RST(Ad)      \
-  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
+  WrZ80f(--CPU.SP.W,CPU.PC.B.h);WrZ80f(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
 
 #define M_LDWORD(Rg)   \
   CPU.Rg.B.l=OpZ80(CPU.PC.W++);CPU.Rg.B.h=OpZ80(CPU.PC.W++)
@@ -530,7 +530,11 @@ static void CodesED_R800(void)
   {
 #define CYCLES_REPEAT_EXIT 1
 #define CYCLES_BLOCK_EXIT 0
+#undef  WrZ80f
+#define WrZ80f WrZ80fast
 #include "CodesED.h"
+#undef  WrZ80f
+#define WrZ80f WrZ80
 #undef CYCLES_REPEAT_EXIT
 #undef CYCLES_BLOCK_EXIT
     case PFX_ED:
@@ -551,7 +555,11 @@ static void CodesDD_R800(void)
 
   switch(I)
   {
+#undef  WrZ80f      
+#define WrZ80f WrZ80fast
 #include "CodesXX.h"
+#undef  WrZ80f
+#define WrZ80f WrZ80
     case PFX_FD:
     case PFX_DD:
       CPU.PC.W--;break;
@@ -574,7 +582,11 @@ static void CodesFD_R800(void)
 
   switch(I)
   {
+#undef  WrZ80f
+#define WrZ80f WrZ80fast      
 #include "CodesXX.h"
+#undef  WrZ80f
+#define WrZ80f WrZ80
     case PFX_FD:
     case PFX_DD:
       CPU.PC.W--;break;
@@ -646,6 +658,7 @@ int ExecZ80(register int RunCycles)
 #define CYCLES_JR_NOT_TAKEN 5
 #define CYCLES_CALL_TAKEN 7
 #define CYCLES_RET_TAKEN 6
+#undef  WrZ80f
 #define WrZ80f WrZ80
 #include "Codes.h"
 #undef CYCLES_JR_NOT_TAKEN

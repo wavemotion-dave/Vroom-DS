@@ -25,11 +25,10 @@
 #include "fdc_toshiba.h"
 #include "printf.h"
 
-#define SHADOW_MAIN  (RAM_SIZE_KB-64) // The S1990 controller and BIOS will put shadow ROM just before RAM end
+// The S1990 controller and BIOS will put shadow ROM just before RAM end
+#define SHADOW_MAIN  (RAM_SIZE_KB-64)
 #define SHADOW_SUB   (RAM_SIZE_KB-32)
 #define SHADOW_KANJI (RAM_SIZE_KB-16)
-
-#define DRAM_SHADOW     1
 
 // -------------------------------------------------------------
 // Some MSX Mapper / Slot Handling and sound generation stuff...
@@ -44,7 +43,7 @@ u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;      // True 
 u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;      // True if game is making use of Konami SCC
 u8 special_memory_access    __attribute__((section(".dtcm"))) = 0x00;   // This lets us know we've got something special mapped into memory
 u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;      // If we cross a threshold, we decare we are MSX-MUSIC capable (and mix in the proper sound)
-u8 msx_subslot3              __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
+u8 msx_subslot3             __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
 u8 msx_subslot0             __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
 u16 turbo_timer             __attribute__((section(".dtcm"))) = 0x0000; // Rough Turbo-R timer handling - advanced 16 ticks every scanline.
 u8 last_port_write          __attribute__((section(".dtcm"))) = 0x00;
@@ -261,8 +260,8 @@ __attribute__((noinline)) u8 read_port_E5(void)
 }
 
 typedef struct {
-    dpair PC;
-    pair SP, AF, BC, DE, HL, AF1, BC1, DE1, HL1, IX, IY;
+    dpair PC, SP;
+    pair AF, BC, DE, HL, AF1, BC1, DE1, HL1, IX, IY;
     u8 I, R, R_HighBit, IFF;
 } CPURegs;   // adjust field types to match Z80 struct
 
@@ -293,7 +292,9 @@ __attribute__((noinline)) void write_port_E5(u8 Value)
             s1990_reg6 = Value & 0x60;
             s1990_is_r800 = (s1990_reg6 & 0x20) ? 0:1;
 
-            // Are we switching CPUs?
+            // -------------------------------------------------------------------
+            // Are we switching CPUs? Save registers and restore the incoming CPU.
+            // -------------------------------------------------------------------
             if (turbo_r_boost != s1990_is_r800)
             {
                 SaveRegs(&saved_regs[turbo_r_boost]);      // departing CPU, old mode
@@ -301,13 +302,12 @@ __attribute__((noinline)) void write_port_E5(u8 Value)
                 turbo_r_boost = s1990_is_r800;
             }
             
-            u8 changed = old_reg6 ^ s1990_reg6;
-            if (changed & 0x40)                       // DRAM bit changed, either direction
+            if ((old_reg6 ^ s1990_reg6) & 0x40)            // DRAM bit changed, either direction
             {
-                if (s1990_reg6 == 0x00)
-                {
-                    // Diagnostics here...
-                }
+                // -------------------------------------------------------------------------
+                // If DRAM changed, we need to remap the pages as some of the System ROMs
+                // might have shifted into DRAM or we might be back to normal ROM handling.
+                // -------------------------------------------------------------------------
                 msx_slot_map_turboR(Port_PPI_A);
             }
             break;
@@ -663,7 +663,7 @@ __attribute__((noinline)) u8 Mouse_Read(void)
     if (needLatch)
     {
         needLatch = 0;
-        mouse.latX = -mouse.pendX;   // drop the minus signs if the cursor goes backwards
+        mouse.latX = -mouse.pendX;
         mouse.latY = -mouse.pendY;
         mouse.pendX = 0;
         mouse.pendY = 0;
@@ -811,12 +811,18 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
 }
 
 
+// -----------------------------------------------------------------------------
+// To avoid calling the overhead of readmem16() and writemem16() we keep pages
+// of fast memory to indicate what 256 byte page is 'special' in that it might
+// respond to special read/write handling. 98% of the time, it's not special
+// so the Z80/R800 can just take the fast path and read directly without worry.
+// -----------------------------------------------------------------------------
 u8 SpecialPage[256] __attribute__((section(".dtcm"), aligned(4))) = {0};
 u8 WriteSlow[256]   __attribute__((section(".dtcm"), aligned(4))) = {0};
 
 void UpdateSpecialPages(void)
 {
-    static u32 lastKey = 0xFFFFFFFF;
+    static u32 lastKey = 0xFFFFFFFF; // So we only update when there is a change...
 
     const u32 sccOn  = (special_memory_access & SPEC_MEM_SCC_ENABLED) && bCartInPage[2];
     const u32 diskOn = special_memory_access & SPEC_MEM_DISK_CONTROLLER;
@@ -825,6 +831,7 @@ void UpdateSpecialPages(void)
     u32 key = (sccOn ? 1 : 0) | (diskOn ? 2 : 0) | (subOn ? 4 : 0)
             | (bRAMInPage[0] ? 8 : 0)  | (bRAMInPage[1] ? 16 : 0)
             | (bRAMInPage[2] ? 32 : 0) | (bRAMInPage[3] ? 64 : 0);
+    
     if (key == lastKey) return;                 // nothing that matters changed
     lastKey = key;
 
@@ -863,14 +870,12 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 0;
-#if DRAM_SHADOW // No DRAM Shadow for now
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[0] = RAM_Memory + (SHADOW_MAIN * 1024);
                     MemoryMap[1] = RAM_Memory + (SHADOW_MAIN * 1024);
                 }
                 else
-#endif                
                 {
                     MemoryMap[0] = TURBO_BIOS;
                     MemoryMap[1] = TURBO_BIOS;
@@ -901,14 +906,12 @@ void msx_slot_map_turboR(unsigned char Value)
             bRAMInPage[0] = 0;
             if (((msx_subslot3 & 0x03) >> 0) == 1) // Subslot 1 has Extended BIOS
             {
-#if DRAM_SHADOW // No DRAM Shadow for now
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[0] = RAM_Memory + (SHADOW_SUB * 1024);
                     MemoryMap[1] = RAM_Memory + (SHADOW_SUB * 1024);
                 }
                 else
-#endif                
                 {
                     MemoryMap[0] = (u8 *)TURBO_SUB;
                     MemoryMap[1] = (u8 *)TURBO_SUB;
@@ -936,14 +939,12 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
-#if DRAM_SHADOW // No DRAM Shadow for now                
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[2] = RAM_Memory + (SHADOW_MAIN * 1024);
                     MemoryMap[3] = RAM_Memory + (SHADOW_MAIN * 1024);
                 }
                 else
-#endif                
                 {
                     MemoryMap[2] = TURBO_BIOS;
                     MemoryMap[3] = TURBO_BIOS;
@@ -1013,14 +1014,12 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 bCartInPage[1] = 0;
                 bRAMInPage[1] = 0;
-#if DRAM_SHADOW // No DRAM Shadow for now
                 if (s1990_reg6 == 0x00)
                 {
                     MemoryMap[2] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
                     MemoryMap[3] = RAM_Memory + (SHADOW_KANJI * 1024) - 0x4000;
                 }
                 else
-#endif               
                 {
                     MemoryMap[2] = (u8 *)TURBO_KANJI+0x0000 - 0x4000;
                     MemoryMap[3] = (u8 *)TURBO_KANJI+0x2000 - 0x6000;
@@ -1361,100 +1360,14 @@ u8 Is16kBanking(u8 media_id)
     }
 }
 
+// ----------------------------------------------------------------------------------------------------------------
+// For Vroom-DS, we are only supporting the common mappers. This is not Hachibitto and full MSX/MSX2/2+ emulation.
+// ----------------------------------------------------------------------------------------------------------------
 void MSX_CartSetup(u8 media_id)
 {
     u8 *CART_Memory = ROM_Memory + (media_id == MEDIA_CART1 ? 0 : ((MAX_CART_SIZE_KB/2)*1024));
 
-    // ------------------------------------------------------------
-    // Setup the Z80 memory based on the MSX game ROM size loaded
-    // ------------------------------------------------------------
-    if (MyMedia[media_id].filesize == (8 * 1024)) // 8K Cartridges
-    {
-        if (msx_basic)  // Basic Game loads at 0x8000 ONLY (no mirrors)
-        {
-            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 4 - Actual ROM is here
-            MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
-        }
-        else            // Mirrors at every 8K
-        {
-            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x0000;        // Segment 0
-        }
-    }
-    else if (MyMedia[media_id].filesize <= (16 * 1024)) // 16K Cartridges
-    {
-        if (msx_basic)  // Basic Game loads at 0x8000 without Mirrors
-        {
-            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1
-            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
-        }
-        else    // Mirrors every 16K
-        {
-            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x2000;        // Segment 1
-        }
-    }
-    else if (MyMedia[media_id].filesize <= (32 * 1024))
-    {
-        if (msx_init >= 0x4000 || msx_basic) // This comes from the .ROM header - if the init address is 0x4000 or higher, we load in bank 1+2
-        {
-            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x4000;        // Segment 2 Mirror
-            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x6000;        // Segment 3 Mirror
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;        // Segment 2
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;        // Segment 3
-            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0 Mirror
-            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x2000;        // Segment 1 Mirror
-        }
-        else  // Otherwise we load in bank 1+2 and mirrors on 0+3
-        {
-            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0 Mirror
-            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x2000;        // Segment 1 Mirror
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x4000;        // Segment 2
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x6000;        // Segment 3
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x4000;        // Segment 2 Mirror
-            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x6000;        // Segment 3 Mirror
-        }
-    }
-    else if (MyMedia[media_id].filesize == (48 * 1024) && (MyMedia[media_id].mapperType != SCC8))
-    {
-        MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Mirror of Segment 0
-        MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x2000;        // Mirror of Segment 1
-        MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
-        MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
-        MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;        // Segment 2
-        MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;        // Segment 3
-        MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x8000;        // Segment 4
-        MSXCartPtr[media_id][7] = (u8*)CART_Memory+0xA000;        // Segment 5
-    }
-    else if ((MyMedia[media_id].filesize >= (16 * 1024)) && (MyMedia[media_id].filesize <= (MAX_CART_SIZE_KB * 1024)))   // We'll take anything between these two...
+    if ((MyMedia[media_id].filesize >= (16 * 1024)) && (MyMedia[media_id].filesize <= (MAX_CART_SIZE_KB * 1024)))   // We'll take anything between these two...
     {
         if ((MyMedia[media_id].mapperType == KON8) || (MyMedia[media_id].mapperType == SCC8))
         {
@@ -1532,6 +1445,17 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment Unmapped
+        }
+        else // Just put it in Pages 1+2
+        {
+            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0 Mirror
+            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x2000;        // Segment 1 Mirror
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x4000;        // Segment 2
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x6000;        // Segment 3
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
+            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x4000;        // Segment 2 Mirror
+            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x6000;        // Segment 3 Mirror
         }
 
         // ---------------------------------------------------------------------

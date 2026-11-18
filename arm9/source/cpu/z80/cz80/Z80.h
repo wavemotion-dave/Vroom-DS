@@ -98,7 +98,8 @@ typedef union
 typedef struct
 {
   dpair PC;                         /* Program Counter - native 32-bit speed*/
-  pair AF,BC,DE,HL,IX,IY,SP;        /* Main registers                       */
+  dpair SP;                         /* Stack Pointer - native 32-bit speed  */
+  pair AF,BC,DE,HL,IX,IY;           /* Main registers                       */
   pair AF1,BC1,DE1,HL1;             /* Shadow registers                     */
   byte IFF,I;                       /* Interrupt registers                  */
   int  IPeriod,ICount;              /* Set IPeriod to number of CPU cycles  */

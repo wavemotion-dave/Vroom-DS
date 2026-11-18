@@ -2853,8 +2853,10 @@ u32 LoopZ80(void)
 
     if (mid_frame_interrupt)
     {
-        RefereshPreviousLine();
-        mid_frame_interrupt = 0;
+        if (--mid_frame_interrupt == 0)
+        {
+            RefereshPreviousLine();
+        }
     }
 
     extern u16 turbo_timer;
@@ -2901,7 +2903,7 @@ u32 LoopZ80(void)
 
         if (((CurLine - 1) >= VDP9938_START_LINE) && ((CurLine - 1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
         {
-            mid_frame_interrupt = 1;
+            mid_frame_interrupt = 3; // Wait 3 lines... then refresh 
         }
     }
 
