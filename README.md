@@ -4,7 +4,7 @@ Requires a DSi/XL/LL and will NOT run in DS-Lite or 'Compatibility' mode. The ga
 will check to make sure you have the needed processing power and RAM to run the game.
 
 ![Vroom-DS](arm9/gfx_data/topscreen.png)
-![Vroom-DS](arm9/gfx_data/pdev_bg0.png)
+![Vroom-DS](arm9/gfx_data/logoscreen.png)
 
 # Donations Welcome (but never required!)
 
