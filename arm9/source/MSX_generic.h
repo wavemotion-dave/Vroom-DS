@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 512
-#define CONFIG_VER                  0x0007
+#define CONFIG_VER                  0x0008
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -102,7 +102,7 @@ extern volatile u8 pcm_sample_delay_frames;
 extern volatile u8 pcm_sample_silence_frames;
 extern volatile u8 pcm_sample_frame_active;
 extern u8 pcm_sample_current;
-extern s32 pcm_sample_filtered;
+extern s32 pcm_sample_current_scaled;
 
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
 
@@ -146,8 +146,7 @@ extern u8 render_blended;
 extern u8 msx_dos22;
 extern u32 dos22_bank;
 extern u16 zone_terra_hack;
-extern u8 turbo_r_boost;
-extern u8 SpecialPage[256];
+extern u8 turbo_r_mode;
 
 extern FI_MSX gpFic[MAX_FILES];
 extern int ucGameAct;
@@ -176,7 +175,7 @@ extern u8 zanac_glitch_patch;
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
 #define    MAX_CART_SIZE_KB     4096    // 4MB Cart
-#define    MAX_DISK_SIZE_KB     720     // Standard DSDD
+#define    MAX_DISK_SIZE_KB     720     // Standard DSDD disk is 720K
 #define    RAM_SIZE_KB          2048    // 2MB RAM
 
 extern u8 *ROM_Memory;
@@ -184,8 +183,7 @@ extern u8 *DISK_Memory;
 extern u8 *DISK_Memory1;
 extern u8 *DISK_Memory2;
 extern u8 *RAM_Memory;
-extern u8 BIOS_Memory[0x8000];
-extern u8 SRAM_Memory[0x8000];
+extern u8 SRAM_Memory[0x2000];
 
 extern u8 TURBO_BIOS[32*1024];
 extern u8 TURBO_SUB[16*1024];
@@ -246,7 +244,6 @@ extern u8 bMainMenuActive;
 // Some CPU and VDP and SGM stuff that we need
 // --------------------------------------------------
 extern void Loop9938(void);
-extern void msxUpdateScreen(void);
 extern void LoadFileAndComputeCRC(u8 media_id);
 extern void msxLoadState();
 extern void msxSaveState();

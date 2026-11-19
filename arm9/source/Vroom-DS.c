@@ -54,13 +54,12 @@ u32 debug[0x10] = {0};
 u32 DX = 0;
 u32 DY = 0;
 
-u32 last_vsync_count    __attribute__((section(".dtcm"))) = 0xFEEDBEEF;
 s8 temp_offset          __attribute__((section(".dtcm"))) = 0;
 u8 slide_dampen         __attribute__((section(".dtcm"))) = 0;
 u8 skip_render          __attribute__((section(".dtcm"))) = 0;
 u8 zoom_screen          __attribute__((section(".dtcm"))) = 0;
 u8 bClickRemoveNeeded   __attribute__((section(".dtcm"))) = 1;
-u8 turbo_r_boost        __attribute__((section(".dtcm"))) = 0;
+u8 turbo_r_mode         __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
 // The MSX systems have ROM, RAM, BIOS, Music Carts or SRAM. So we create generic buffers
@@ -75,8 +74,7 @@ u8 *ROM_Memory;                         // ROM Carts up to 1MB/4MB (that's prett
 u8 *DISK_Memory;                        // Disk Memory will be 720K to support DSDD disks
 u8 *DISK_Memory1;                       // Disk Memory will be 720K to support DSDD disks
 u8 *RAM_Memory;                         // RAM is 1024K for the TURBO-R
-u8 BIOS_Memory[0x8000] ALIGN(32) = {0}; // To hold our MSX BIOS - always in the lower 32K memory region of slot 0
-u8 SRAM_Memory[0x8000] ALIGN(32) = {0}; // To hold up to 32K of SRAM (FM-PAC, Game Master 2, or special SRAM capable carts)
+u8 SRAM_Memory[0x2000] ALIGN(32) = {0}; // To hold our PAC-SRAM 8K of persisted memory
 
 u8 io_show_status = 0;     // Used to indicate a disk activity icons
 u8 sram_show_status = 0;   // Used to show SRAM icon for SRAM-based carts
@@ -247,7 +245,7 @@ void SoundUnPause(void)
 // We were using the normal ARM7 sound core but it sounded "scratchy" and so with the help
 // of FluBBa, we've swiched over to the maxmod sound core which performs much better.
 // --------------------------------------------------------------------------------------------
-#define sample_rate (18600)  // To match the sound driver - this is good enough quality for the DS
+#define sample_rate (18600)    // To match the sound driver - this is good enough quality for the DS
 #define buffer_size (512 + 16) // Enough buffer that we don't have to fill it too often. Must be multiple of 16.
 
 mm_ds_system sys   __attribute__((section(".dtcm")));
@@ -265,7 +263,7 @@ s16 last_sample __attribute__((section(".dtcm"))) = 0;
 // pop/click heard as the new mixer comes online. This routine is designed to perform a simple quick mixing
 // and drive the sample output towards the new target to soften the pop/click. It's not perfect but it helps...
 // ------------------------------------------------------------------------------------------------------------
-mm_word ClickRemoval(mm_word len, mm_addr dest)
+__attribute__((noinline)) mm_word ClickRemoval(mm_word len, mm_addr dest)
 {
     s16 mix1[16];
     s16 mix2[16];
@@ -359,7 +357,7 @@ void handle_scc_sound(mm_word len, mm_addr dest)
     }
 }
 
-void handle_pcm_sound(mm_word len, mm_addr dest)
+inline void handle_pcm_sound(mm_word len, mm_addr dest)
 {
     s16 *output = (s16 *)dest;
 
@@ -368,6 +366,16 @@ void handle_pcm_sound(mm_word len, mm_addr dest)
         output[i] = PCM_MixSample();
     }
 }
+
+__attribute__((noinline)) void handle_pause(mm_word len, mm_addr dest)
+{
+    s16 *p = (s16 *)dest;
+    for (int i = 0; i < len; i++)
+    {
+        *p++ = last_sample; // To prevent pops and clicks... just keep outputting the last sample
+    }
+}
+
 // -----------------------------------------------------------------------------------------------
 // This is our main sound mixer. It's called periodically by the maxmod handler when it needs
 // more samples in the buffer. We mix AY + MSX-MUSIC as that's the sound setup for Illusion City.
@@ -376,11 +384,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
 {
     if (soundEmuPause) // If paused, just "mix" in mute sound chip... all channels are OFF
     {
-        s16 *p = (s16 *)dest;
-        for (int i = 0; i < len; i++)
-        {
-            *p++ = last_sample; // To prevent pops and clicks... just keep outputting the last sample
-        }
+        handle_pause(len, dest);
     }
     else
     {
@@ -624,18 +628,17 @@ void ShowDebugZ80(void)
         if ((VDP[25] & 0x18) == 0x18) screen = 11;
         else if ((VDP[25] & 0x18) == 0x08) screen = 12;
     }
-    sprintf(tmpStr, "S%-2d A8=%02X %02X", screen, Port_PPI_A, msx_subslot3);
+    sprintf(tmpStr, "S%-2d A8=%02X %02X%02X", screen, Port_PPI_A, msx_subslot0, msx_subslot3);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "FD.ST=%02X CM=%02X", FDC.status, FDC.command);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "Mapper %d [%02X]", MyMedia[MEDIA_CART1].mapperType, MyMedia[MEDIA_CART1].mapperMask);
     DSPrint(0, idx++, 7, tmpStr);
-    extern u32 halt_counter;
-    sprintf(tmpStr, "Halt C %d", halt_counter & 0x1FFFF);
+    sprintf(tmpStr, "R800=%02X HC=%02X", s1990_reg6, CPU.HaltCount);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "%d Free", getMemFree());
     DSPrint(0, idx++, 7, tmpStr);
-
+    
     idx = 6;
     for (u8 i = 0; i < 16; i++)
     {
@@ -726,7 +729,7 @@ void DisplayStatusLine(void)
         }
         else // Show the boost / flame icon or clear it...
         {
-            if (turbo_r_boost)
+            if (turbo_r_mode)
             {
                 if (s1990_reg6 == 0x00)
                 {
@@ -1360,11 +1363,8 @@ void VroomDSRunEmu(void)
             // ----------------------------------------------------------------------------
             while (TIMER2_DATA < (546*(timingFrames+1)))
             {
-                if (skip_render) break;
+                if (skip_render && timingFrames < 59) break;
             }
-
-            // And copy out XBuf[] to the DS VRAM!
-            msxUpdateScreen();
 
             // If the Z80 Debugger is enabled, call it every frame. Expensive but we need the debug!
             if (myGlobalConfig.debugger)
@@ -1372,6 +1372,8 @@ void VroomDSRunEmu(void)
                 ShowDebugZ80();
             }
             
+            // Get ready for the next frame...
+            skip_render = 0;    // Assume we draw the frame until proven otherwise
             render_blended = 0; // Assume no blend... Checked directly below.
 
             // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
@@ -1406,9 +1408,9 @@ void VroomDSRunEmu(void)
                 render_blended = 1;
             }
             
-            // ----------------------------
-            // If blending has changed...
-            // ----------------------------
+            // --------------------------------------------------------------------------------------
+            // If blending has changed... we might need to enable/disable the Alpha Blend on the DSi
+            // --------------------------------------------------------------------------------------
             if (old_blended != render_blended)
             {
                 old_blended = render_blended;
@@ -2222,6 +2224,25 @@ void VroomDSInitCPU(void)
     msx_restore_bios();
 }
 
+__attribute__((noinline)) void handle_screen_slide(void)
+{
+    if (slide_dampen == 0)
+    {
+        if (temp_offset > 0)
+        {
+            temp_offset--;
+        }
+        else
+        {
+            temp_offset++;
+        }
+    }
+    else
+    {
+        slide_dampen--;
+    }
+}
+
 // -----------------------------------------------------------------
 // This is where we handle our pan/scan up and down as well as
 // some basic vSYNC timing so that we lock the DS screen updates
@@ -2246,6 +2267,7 @@ ITCM_CODE void irqVBlank(void)
             FlipScreenBuffer(flip_to);
             ready_to_flip = 0;
         }
+        
         // ---------------------------------------------------------------------
         // Are we in 192 scanline mode? If so, we don't need ANY screen panning.
         // ---------------------------------------------------------------------
@@ -2286,24 +2308,14 @@ ITCM_CODE void irqVBlank(void)
 
     if (temp_offset)
     {
-        if (slide_dampen == 0)
-        {
-            if (temp_offset > 0)
-            {
-                temp_offset--;
-            }
-            else
-            {
-                temp_offset++;
-            }
-        }
-        else
-        {
-            slide_dampen--;
-        }
+        handle_screen_slide();
     }
 }
 
+// -------------------------------------------------------------------------------
+// Two warnings... type 1 is we are not a DSi and don't have the CPU horsepower 
+// to run this emulation and type 2 is missing some of the firmware files needed.
+// -------------------------------------------------------------------------------
 void ShowWarning(u8 type)
 {
     swiWaitForVBlank();
@@ -2673,29 +2685,18 @@ void msxInit(void)
     ResetMSX();
 }
 
-void FlipScreenBuffer(u8 flip_buffer)
+// -------------------------------------------------------------------------------
+// Toggle between BG2 and BG3 which is our way of direct rendering the screen.
+// We write to the non-visible background for the next frame. This isn't perfect
+// because we can't always keep up at 60fps but it minimizes glitches/artifacts.
+// -------------------------------------------------------------------------------
+__attribute__((noinline)) void FlipScreenBuffer(u8 flip_buffer)
 {
-    if (!render_blended)
+    if (!render_blended) // If we are blending we need both displays active
     {
         u32 d = REG_DISPCNT & ~(DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
         REG_DISPCNT = d | (flip_buffer ? DISPLAY_BG3_ACTIVE : DISPLAY_BG2_ACTIVE);
     }
-}
-
-/*********************************************************************************
- * Update the screen for the current cycle. On the DSi this will generally
- * be called right after swiWaitForVBlank() in VDP9938a.c which will help
- * reduce visual tearing and other artifacts. It's not strictly necessary
- * and that does slow down the loop a bit... but DSi can handle it.
- ********************************************************************************/
-void msxUpdateScreen(void)
-{
-    if (!skip_render)
-    {
-        overscan_trick = 0;
-    }
-
-    skip_render = 0;
 }
 
 // -------------------------------------------------------------------------
@@ -2828,8 +2829,8 @@ int mid_frame_interrupt = 0;
 int H_BlankCycles = 54;
 u32 LoopZ80(void)
 {
-    static const u32 cpu_adjust[4] = {0, 29, 45, 228};  // Roughly 3.58Mhz, 4.0MHz, 4.3MHz and 7.16Mhz. We can't handle the last one at anywhere near full speed.
-    static const u32 hsync_adjust[4] = {0, 7, 10, 54};
+    static const u32 cpu_adjust[4] = {0, 29, 45, 74};  // Roughly 3.58Mhz, 4.0MHz, 4.3MHz and 4.75Mhz
+    static const u32 hsync_adjust[4] = {0, 7, 10, 21};
     
     // Execute 1 scanline worth of CPU instructions
     u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit; // Default to Z80 timing
@@ -2842,7 +2843,7 @@ u32 LoopZ80(void)
     // do is run the R800 at roughly 4 or 4.5 MHz give or take depending on configuration.
     // It's far from perfect but a surprising number of games will run fine at that speed.
     // -----------------------------------------------------------------------------------
-    if (turbo_r_boost)
+    if (turbo_r_mode)
     {
         cycles_to_process += cpu_adjust[myConfig.cpuBoost];
         H_BlankCycles += hsync_adjust[myConfig.cpuBoost];

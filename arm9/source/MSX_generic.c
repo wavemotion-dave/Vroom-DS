@@ -1075,6 +1075,7 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.fdc_driver     = FDC_TOSH;
         myConfig.frameSkip      = FS_LIGHT;
+        myConfig.cpuBoost       = CPU_BOOST_FAST;
     }
 
     if (strstr(filename, "NEON") && strstr(filename, "REVENANT"))
@@ -1194,6 +1195,7 @@ void ApplyDatabaseTweaks(void)
         myConfig.frameSkip      = FS_LIGHT; // Needs blending
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.ymBalance      = YM_BAL_HIGH;
+        myConfig.fakeFMPAC      = 1;
         myConfig.pcm            = 1;
     }
 
@@ -1462,7 +1464,7 @@ const struct options_t Option_Table[1][20] =
     // Page 1 - Game Options
     {
         {"MSX MAPPER",      {"GUESS", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "ASCII 16X", "NEO8", "NEO16"},                                                &myConfig.msxMapper,         7},
-        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "TRUE"},                                                                                                         &myConfig.cpuBoost,          4},
+        {"R800 SPEED",      {"SLOW", "MEDIUM", "FAST", "MAX"},                                                                                                          &myConfig.cpuBoost,          4},
         {"FRAMESKIP",       {"NONE", "LIGHT", "HEAVY"},                                                                                                                 &myConfig.frameSkip,         3},
         {"DPAD",            {"NORMAL", "DIAGONALS", "MOUSE", "SLIDE-N-GLIDE"},                                                                                          &myConfig.dpad,              4},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},

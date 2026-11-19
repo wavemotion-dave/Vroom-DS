@@ -45,6 +45,26 @@ The Vroom-DS emulator is offered as-is, without any warranty.
 
 Credit to @PantheonMusic - Opening "Fast Pace Dramatic Score" music
 
+What is Worth Playing
+-----------------------
+
+There aren't more than about 40 games total for the turbo-R. It was well past twilight for the MSX systems 
+when it came out and most developers had moved on to other systems (Amiga, PC, SNES, Genesis, etc). But there
+are some real gems for the turbo-R in that small group. I'll highlight 10 of the games that I really enjoyed.
+
+| Game     | Description |
+| -------- | --------    |
+| ![Slot Map](images/gradius3.bmp)  | Gradius 3. This is not a turbo-R exclusive but there is a Victor Martínez enhancement patch version that offers amazing smooth scroll and R800 handling on the turbo-R. Seek it out! |
+| ![Slot Map](images/hoppiru.bmp)  | Hoippuru in the Magical Land. A cute puzzle game with bright, colorful graphics that is worth a play. |
+| ![Slot Map](images/illusion_city.bmp)  | Illusion City. Many consider this to be the best turbo-R game ever made. Cyberpunk futuristic thriller of an RPG and well worth playing. Use the ASCII16X 4MB ROM. |
+| ![Slot Map](images/multiplex.bmp)  | Multi-Plex. They said parallax scrolling was too difficult to pull off during gameplay. This fast horizontal shooter proves them wrong. |
+| ![Slot Map](images/paradream.bmp)  | Paradream. A solid Parodius-em-up shooter that has beautiful color and level presentation.|
+| ![Slot Map](images/seed_dragon.bmp)  | Seed of Dragon. One of the few games that features voices done via PCM. The semi-recent English Translation even translates the voices into English. |
+| ![Slot Map](images/treasure_babylon.bmp)  | Treasure of Babylon. Another puzzle game that for some reason I really dig - slow paced so you can just think ahead.|
+| ![Slot Map](images/moonlight.bmp)  | Moonlight Saga. Along with Illusion City, often considered one of the very best the turbo-R has to offer. A colorful game that will please RPG fans.|
+| ![Slot Map](images/stage11.bmp)  | Stage 11 Kai. No idea why this isn't just an MSX1 game but it's still quite good battling a single boss trying to outlast it.|
+
+
 Virtual Slot Map :
 -----------------------
 ![Slot Map](images/slotmap.png)

@@ -16,7 +16,7 @@
 
 #include "soundbank.h"
 #include "topscreen.h"
-#include "pdev_bg0.h"
+#include "logoscreen.h"
 #include "printf.h"
 
 void vblankIntro() 
@@ -46,14 +46,14 @@ void intro_logo(void)
     
   mmEffect(SFX_MUS_INTRO);
 
-  // Show portabledev
+  // Show intro logos
   decompress(topscreenTiles, bgGetGfxPtr(bg1), LZ77Vram);
   decompress(topscreenMap, (void*) bgGetMapPtr(bg1), LZ77Vram);
   dmaCopy((void *) topscreenPal,(u16*) BG_PALETTE,256*2);
 
-  decompress(pdev_bg0Tiles, bgGetGfxPtr(bg1s), LZ77Vram);
-  decompress(pdev_bg0Map, (void*) bgGetMapPtr(bg1s), LZ77Vram);
-  dmaCopy((void *) pdev_bg0Pal,(u16*) BG_PALETTE_SUB,256*2);
+  decompress(logoscreenTiles, bgGetGfxPtr(bg1s), LZ77Vram);
+  decompress(logoscreenMap, (void*) bgGetMapPtr(bg1s), LZ77Vram);
+  dmaCopy((void *) logoscreenPal,(u16*) BG_PALETTE_SUB,256*2);
 
   FadeToColor(0,BLEND_FADE_BLACK | BLEND_SRC_BG0 | BLEND_DST_BG0,3,0,3);
 

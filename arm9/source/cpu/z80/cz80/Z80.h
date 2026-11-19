@@ -1,5 +1,5 @@
 /******************************************************************************
-*  Hachibitto Z80 CPU 
+*  Vroom-DS Z80 CPU 
 *
 * Note: Most of this file is from the ColEm emulator core by Marat Fayzullin
 *       but heavily modified for specific NDS use. If you want to use this
@@ -107,7 +107,7 @@ typedef struct
   int  CycleDeficit;                /* Cycle deficit from last scanline     */
   int  IBackup;                     /* Private, don't touch                 */
   word IRequest;                    /* Set to address of pending IRQ        */
-  byte reserved;                    /* Rserved for future use               */
+  byte HaltCount;                   /* Simple counter tracking              */
   byte TrapBadOps;                  /* Set to 1 to warn of illegal opcodes  */
   byte Trace;                       /* Set Trace=1 to start tracing         */
   byte R_HighBit;                   /* Used to preserve the high bit for R  */

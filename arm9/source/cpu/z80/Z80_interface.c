@@ -725,17 +725,7 @@ static MapperWriteHandler const mapperWriteHandlers[END_MAPPERS] __attribute__((
 // ---------------------------------------------------------------------
 ITCM_CODE void cpu_writemem16(u16 address, u8 value)
 {
-    if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
-    {
-        if (special_memory_access & SPEC_MEM_SUBSLOT0_ACTIVE) msx_subslot0 = value;
-        else msx_subslot3 = value;
-        cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
-    }
-    else if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
-    {
-        MemoryMap[address>>13][address]=value;
-    }
-    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF0) && (address <= 0x7FFF)) // Disk controller memory map... (including Turbo-R DOS 2.3 if enabled)
+    if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF0) && (address <= 0x7FFF)) // Disk controller memory map... (including Turbo-R DOS 2.3 if enabled)
     {
         HandleDiskControl(address, value);
     }
@@ -757,6 +747,16 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
         {
             mapperWriteHandlers[mapper_type](media_id, address, value);
         }
+    }
+    else if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
+    {
+        if (special_memory_access & SPEC_MEM_SUBSLOT0_ACTIVE) msx_subslot0 = value;
+        else msx_subslot3 = value;
+        cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
+    }
+    else if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
+    {
+        MemoryMap[address>>13][address]=value;
     }
 }
 

@@ -1,5 +1,5 @@
 /******************************************************************************
-*  Hachibitto Z80 CPU 
+*  Vroom-DS Z80 CPU 
 *
 * Note: Most of this file is from the ColEm emulator core by Marat Fayzullin
 *       but heavily modified for specific NDS use. If you want to use this

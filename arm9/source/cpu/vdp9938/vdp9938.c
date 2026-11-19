@@ -32,7 +32,7 @@ static __attribute__((noinline)) void ApplyLeftMask(void);
 u32 __attribute__((section(".dtcm"))) last_vdp_access = 999;
 inline __attribute__((always_inline)) void VDP9938WaitForR800Access(void)
 {
-  if (turbo_r_boost)
+  if (turbo_r_mode)
   {
       u32 access_delta = (last_vdp_access - CPU.ICount);
       if (access_delta < 50)
@@ -2497,63 +2497,69 @@ ITCM_CODE void Screen10_Line_InPlace(u8 *p)
 
     for (int x = 0; x < 256; x += 4, p += 4)
     {
-        int a = p[0];
-        int c = p[1];
-        int d = p[2];
-        int e = p[3];
+        const int a = p[0];
+        const int c = p[1];
+        const int d = p[2];
+        const int e = p[3];
 
-        int K = ((a & 7) | ((c & 7) << 3));
-        int J = ((d & 7) | ((e & 7) << 3));
+        const int K = ((a & 7) | ((c & 7) << 3));
+        const int J = ((d & 7) | ((e & 7) << 3));
 
-        K = (K ^ 32) - 32;
-        J = (J ^ 32) - 32;
+        const u8 *rBase = clamp + ((J ^ 32) - 32) + 32;
+        const u8 *gBase = clamp + ((K ^ 32) - 32) + 32;
 
-        // Hoist shared lookup offsets.
-        const u8 *rBase = clamp + J + 32;
-        const u8 *gBase = clamp + K + 32;
-        int bc = -2 * J - K + 128;
+        const int bc = 128
+            - 2 * ((J ^ 32) - 32)
+            - ((K ^ 32) - 32);
 
-        // Pixel 0
-        int Y = a >> 3;
-        int r = rBase[Y];
-        int g = gBase[Y];
-        int b = clamp[((5 * Y + bc) >> 2)];
+        int Y, r, g, b;
 
-        p[0] = (a & 8)
-            ? XPal[a >> 4]
-            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
+        if (a & 8)
+            p[0] = XPal[a >> 4];
+        else
+        {
+            Y = a >> 3;
+            r = rBase[Y];
+            g = gBase[Y];
+            b = clamp[(5 * Y + bc) >> 2];
+            p[0] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
+        }
 
-        // Pixel 1
-        Y = c >> 3;
-        r = rBase[Y];
-        g = gBase[Y];
-        b = clamp[((5 * Y + bc) >> 2)];
+        if (c & 8)
+            p[1] = XPal[c >> 4];
+        else
+        {
+            Y = c >> 3;
+            r = rBase[Y];
+            g = gBase[Y];
+            b = clamp[(5 * Y + bc) >> 2];
+            p[1] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
+        }
 
-        p[1] = (c & 8)
-            ? XPal[c >> 4]
-            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
+        if (d & 8)
+            p[2] = XPal[d >> 4];
+        else
+        {
+            Y = d >> 3;
+            r = rBase[Y];
+            g = gBase[Y];
+            b = clamp[(5 * Y + bc) >> 2];
+            p[2] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
+        }
 
-        // Pixel 2
-        Y = d >> 3;
-        r = rBase[Y];
-        g = gBase[Y];
-        b = clamp[((5 * Y + bc) >> 2)];
-
-        p[2] = (d & 8)
-            ? XPal[d >> 4]
-            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
-
-        // Pixel 3
-        Y = e >> 3;
-        r = rBase[Y];
-        g = gBase[Y];
-        b = clamp[((5 * Y + bc) >> 2)];
-
-        p[3] = (e & 8)
-            ? XPal[e >> 4]
-            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
+        if (e & 8)
+            p[3] = XPal[e >> 4];
+        else
+        {
+            Y = e >> 3;
+            r = rBase[Y];
+            g = gBase[Y];
+            b = clamp[(5 * Y + bc) >> 2];
+            p[3] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
+        }
     }
 }
+
 
 
 ITCM_CODE void Screen12_Line_InPlace(u8 *p)
@@ -2562,61 +2568,49 @@ ITCM_CODE void Screen12_Line_InPlace(u8 *p)
 
     for (int x = 0; x < 256; x += 4, p += 4)
     {
-        // Read all four pixels before overwriting them.
-        int a = p[0];
-        int c = p[1];
-        int d = p[2];
-        int e = p[3];
+        const int a = p[0];
+        const int c = p[1];
+        const int d = p[2];
+        const int e = p[3];
 
-        // Extract and sign-extend J/K.
-        int K = (a & 7) | ((c & 7) << 3);
-        int J = (d & 7) | ((e & 7) << 3);
+        const int K = (((a & 7) | ((c & 7) << 3)) ^ 32) - 32;
+        const int J = (((d & 7) | ((e & 7) << 3)) ^ 32) - 32;
 
-        K = (K ^ 32) - 32;
-        J = (J ^ 32) - 32;
-
-        // Precompute shared lookup bases.
         const u8 *rBase = clamp + J + 32;
         const u8 *gBase = clamp + K + 32;
-        int bc = -2 * J - K + 128;
 
-        // Pixel 0
-        int Y = a >> 3;
-        int r = rBase[Y];
-        int g = gBase[Y];
-        int b = clamp[(5 * Y + bc) >> 2];
+        const int bc = 128 - (J << 1) - K;
 
-        p[0] = (u8)(((g >> 2) << 5) |
-                    ((r >> 2) << 2) | (b >> 3));
+        // Precalculate all four Y values.
+        const int y0 = a >> 3;
+        const int y1 = c >> 3;
+        const int y2 = d >> 3;
+        const int y3 = e >> 3;
 
-        // Pixel 1
-        Y = c >> 3;
-        r = rBase[Y];
-        g = gBase[Y];
-        b = clamp[(5 * Y + bc) >> 2];
+        int r, g, b;
 
-        p[1] = (u8)(((g >> 2) << 5) |
-                    ((r >> 2) << 2) | (b >> 3));
+        r = rBase[y0];
+        g = gBase[y0];
+        b = clamp[(5 * y0 + bc) >> 2];
+        p[0] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
 
-        // Pixel 2
-        Y = d >> 3;
-        r = rBase[Y];
-        g = gBase[Y];
-        b = clamp[(5 * Y + bc) >> 2];
+        r = rBase[y1];
+        g = gBase[y1];
+        b = clamp[(5 * y1 + bc) >> 2];
+        p[1] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
 
-        p[2] = (u8)(((g >> 2) << 5) |
-                    ((r >> 2) << 2) | (b >> 3));
+        r = rBase[y2];
+        g = gBase[y2];
+        b = clamp[(5 * y2 + bc) >> 2];
+        p[2] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
 
-        // Pixel 3
-        Y = e >> 3;
-        r = rBase[Y];
-        g = gBase[Y];
-        b = clamp[(5 * Y + bc) >> 2];
-
-        p[3] = (u8)(((g >> 2) << 5) |
-                    ((r >> 2) << 2) | (b >> 3));
+        r = rBase[y3];
+        g = gBase[y3];
+        b = clamp[(5 * y3 + bc) >> 2];
+        p[3] = (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
     }
 }
+
 
 #define HScroll8 ((VDP[25] & 0x02) || (VDP[26] & 0x3F) || (VDP[27] & 7))
 #define BORDER_COLOR_SCREEN8 XPal[0]
@@ -2645,7 +2639,7 @@ static inline __attribute__((always_inline)) u32 LdrRot(const u8 *p)
     return v;
 }
 
-ITCM_CODE static void RefreshLine8_HScrollFast(u8 *P, u32 sourceAddress)
+__attribute__((noinline)) static void RefreshLine8_HScrollFast(u8 *P, u32 sourceAddress)
 {
     // 2-pixel quantised: hs is always even, so even/odd banks keep their natural order
     u32 hs = (((VDP[26] & 0x3F) << 3) - (VDP[27] & 7)) & 0xFE;
@@ -2753,11 +2747,7 @@ ITCM_CODE void RefreshLine8(u8 uY)
     }
     else
     {
-        u8 HasSprites = 1;  // Force the memcpy() as direct rendering causes glitches
-
-        uint8_t *P;
-        if (!HasSprites) P = (u8 *)(XBuf[drawn_frame_number&1] + ((u16)uY << 8));
-        else P = RefreshBorder(uY);
+        uint8_t *P = RefreshBorder(uY);
 
         u32 sourceAddress = (u32)(ChrTab - VDP_Memory) + (((u32)(uY + VScroll) << 8) & ChrTabM & 0xFFFF);
         if (FlipEvenOdd && OddPage && sourceAddress >= 0x10000)
@@ -2801,14 +2791,11 @@ ITCM_CODE void RefreshLine8(u8 uY)
         // ---------------------------------------------------------------------------------
         // Runs for BOTH paths: background is already in P (scrolled or not)
         // ---------------------------------------------------------------------------------
-        if (HasSprites)
-        {
-            ColorSpritesScreen8(uY, P - 32);
+        ColorSpritesScreen8(uY, P - 32);
 
-            u32 * restrict dst = (u32 *)(XBuf[drawn_frame_number&1] + ((u16)uY << 8));
-            const u8 * restrict src = (const u8 *)(LineScratch + LS_BASE);
-            memcpy(dst, src, 256);
-        }
+        u32 * restrict dst = (u32 *)(XBuf[drawn_frame_number&1] + ((u16)uY << 8));
+        const u8 * restrict src = (const u8 *)(LineScratch + LS_BASE);
+        memcpy(dst, src, 256);
     }
 }
 

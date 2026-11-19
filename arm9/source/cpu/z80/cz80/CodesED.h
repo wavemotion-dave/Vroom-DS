@@ -1,5 +1,5 @@
 /******************************************************************************
-*  Hachibitto Z80 CPU  (R800 / Turbo-R optimized ED table)
+*  Vroom-DS Z80 CPU  (R800 / Turbo-R optimized ED table)
 *
 * Note: Most of this file is from the ColEm emulator core by Marat Fayzullin
 *       but heavily modified for specific NDS use. If you want to use this
@@ -69,23 +69,23 @@ case SBC_HL_SP: M_SBCW(SP);break;
 
 case LD_xWORDe_HL:
   M_FETCHW(J);
-  WrZ80f(J.W++,CPU.HL.B.l);
-  WrZ80f(J.W,CPU.HL.B.h);
+  WrZ80(J.W++,CPU.HL.B.l);
+  WrZ80(J.W,CPU.HL.B.h);
   break;
 case LD_xWORDe_DE:
   M_FETCHW(J);
-  WrZ80f(J.W++,CPU.DE.B.l);
-  WrZ80f(J.W,CPU.DE.B.h);
+  WrZ80(J.W++,CPU.DE.B.l);
+  WrZ80(J.W,CPU.DE.B.h);
   break;
 case LD_xWORDe_BC:
   M_FETCHW(J);
-  WrZ80f(J.W++,CPU.BC.B.l);
-  WrZ80f(J.W,CPU.BC.B.h);
+  WrZ80(J.W++,CPU.BC.B.l);
+  WrZ80(J.W,CPU.BC.B.h);
   break;
 case LD_xWORDe_SP:
   M_FETCHW(J);
-  WrZ80f(J.W++,CPU.SP.B.l);
-  WrZ80f(J.W,CPU.SP.B.h);
+  WrZ80(J.W++,CPU.SP.B.l);
+  WrZ80(J.W,CPU.SP.B.h);
   break;
 
 case LD_HL_xWORDe:

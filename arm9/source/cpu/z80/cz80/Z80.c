@@ -31,11 +31,10 @@
 
 extern Z80 CPU;
 extern void debug_printf(const char * str, ...);
-u32 halt_counter=0;
 extern u32 debug[];
 extern u32 DX, DY;
 extern u8 *MemoryMap[8];
-extern u8 turbo_r_boost;
+extern u8 turbo_r_mode;
 extern u8 SpecialPage[256];
 extern u8 WriteSlow[256];
 
@@ -44,28 +43,22 @@ extern u8 WriteSlow[256];
 /** up. It has to stay inlined to be fast.                  **/
 /*************************************************************/
 
-inline byte OpZ80(u32 A)    {return (MemoryMap[A>>13][A]);}
+static inline  __attribute__((always_inline)) byte OpZ80(u32 A)
+{
+    return (MemoryMap[A>>13][A]);
+}
 
-static inline byte RdZ80(word A)
+static inline  __attribute__((always_inline)) byte RdZ80(word A)
 {
     if (__builtin_expect(SpecialPage[A >> 8], 0)) return cpu_readmem16(A);
     return MemoryMap[A >> 13][A];
 }
 
-#define WrZ80f WrZ80
-
-ITCM_CODE __attribute__((noinline)) void WrZ80(word A, byte V)
+static inline  __attribute__((always_inline))  void WrZ80(word A, byte V)
 {
     if (__builtin_expect(WriteSlow[A >> 8], 0)) cpu_writemem16(A, V);
     else MemoryMap[A >> 13][A] = V;
 }
-
-inline void WrZ80fast(word A, byte V)
-{
-    if (__builtin_expect(WriteSlow[A >> 8], 0)) cpu_writemem16(A, V);
-    else MemoryMap[A >> 13][A] = V;
-}
-
 
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)
 #define     InZ80(P)         cpu_readport_msx(P)
@@ -121,11 +114,11 @@ inline void WrZ80fast(word A, byte V)
 #define M_POP(Rg)      \
   CPU.Rg.B.l=OpZ80(CPU.SP.W++);CPU.Rg.B.h=OpZ80(CPU.SP.W++)
 #define M_PUSH(Rg)     \
-  WrZ80f(--CPU.SP.W,CPU.Rg.B.h);WrZ80f(--CPU.SP.W,CPU.Rg.B.l)
+  WrZ80(--CPU.SP.W,CPU.Rg.B.h);WrZ80(--CPU.SP.W,CPU.Rg.B.l)
 
 #define M_CALL         \
   J.B.l=OpZ80(CPU.PC.W++);J.B.h=OpZ80(CPU.PC.W++);         \
-  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80f(--CPU.SP.W,CPU.PC.B.l); \
+  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80(--CPU.SP.W,CPU.PC.B.l); \
   CPU.PC.W=J.W; \
   JumpZ80(J.W)
 
@@ -134,7 +127,7 @@ inline void WrZ80fast(word A, byte V)
 #define M_RET CPU.PC.B.l=OpZ80(CPU.SP.W++);CPU.PC.B.h=OpZ80(CPU.SP.W++);JumpZ80(CPU.PC.W)
 
 #define M_RST(Ad)      \
-  WrZ80f(--CPU.SP.W,CPU.PC.B.h);WrZ80f(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
+  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
 
 #define M_LDWORD(Rg)   \
   CPU.Rg.B.l=OpZ80(CPU.PC.W++);CPU.Rg.B.h=OpZ80(CPU.PC.W++)
@@ -532,11 +525,7 @@ static void CodesED_R800(void)
   {
 #define CYCLES_REPEAT_EXIT 1
 #define CYCLES_BLOCK_EXIT 0
-#undef  WrZ80f
-#define WrZ80f WrZ80fast
 #include "CodesED.h"
-#undef  WrZ80f
-#define WrZ80f WrZ80
 #undef CYCLES_REPEAT_EXIT
 #undef CYCLES_BLOCK_EXIT
     case PFX_ED:
@@ -557,11 +546,7 @@ static void CodesDD_R800(void)
 
   switch(I)
   {
-#undef  WrZ80f      
-#define WrZ80f WrZ80fast
 #include "CodesXX.h"
-#undef  WrZ80f
-#define WrZ80f WrZ80
     case PFX_FD:
     case PFX_DD:
       CPU.PC.W--;break;
@@ -584,11 +569,7 @@ static void CodesFD_R800(void)
 
   switch(I)
   {
-#undef  WrZ80f
-#define WrZ80f WrZ80fast      
 #include "CodesXX.h"
-#undef  WrZ80f
-#define WrZ80f WrZ80
     case PFX_FD:
     case PFX_DD:
       CPU.PC.W--;break;
@@ -660,8 +641,6 @@ int ExecZ80(register int RunCycles)
 #define CYCLES_JR_NOT_TAKEN 5
 #define CYCLES_CALL_TAKEN 7
 #define CYCLES_RET_TAKEN 6
-#undef  WrZ80f
-#define WrZ80f WrZ80
 #include "Codes.h"
 #undef CYCLES_JR_NOT_TAKEN
 #undef CYCLES_CALL_TAKEN
@@ -674,7 +653,7 @@ int ExecZ80(register int RunCycles)
     }
     
     // If we switched CPU modes... bail!
-    if (turbo_r_boost)
+    if (turbo_r_mode)
     {
         return CPU.ICount;
     }
@@ -714,14 +693,10 @@ ITCM_CODE int ExecR800(register int RunCycles)
 #define CYCLES_JR_NOT_TAKEN 1
 #define CYCLES_CALL_TAKEN 2
 #define CYCLES_RET_TAKEN 2
-#undef WrZ80f
-#define WrZ80f WrZ80fast
 #include "Codes.h"
 #undef CYCLES_JR_NOT_TAKEN
 #undef CYCLES_CALL_TAKEN
 #undef CYCLES_RET_TAKEN
-#undef WrZ80f
-#define WrZ80f WrZ80
         case PFX_CB: CodesCB_R800();break;
         case PFX_ED: CodesED_R800();break;
         case PFX_FD: CodesFD_R800();break;
@@ -752,7 +727,7 @@ ITCM_CODE int ExecR800(register int RunCycles)
 void IntZ80(Z80 *R,word Vector)
 {
   /* If HALTed, take CPU off HALT instruction */
-  if(CPU.IFF&IFF_HALT) { CPU.PC.W++;CPU.IFF&=~IFF_HALT; }
+  if(CPU.IFF&IFF_HALT) { CPU.PC.W++;CPU.IFF&=~IFF_HALT; CPU.HaltCount++;}
 
   if((CPU.IFF&IFF_1)||(Vector==INT_NMI))
   {

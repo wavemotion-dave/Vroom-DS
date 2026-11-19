@@ -70,7 +70,7 @@ SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 PNGFILES	:=	$(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.png)))
 
-OSPECIALS :=  options.o debug_ovl.o msx_kbd.o mainmenu.o minimenu.o topscreen.o pdev_bg0.o loading.o warning1.o warning2.o
+OSPECIALS :=  options.o debug_ovl.o msx_kbd.o mainmenu.o minimenu.o topscreen.o logoscreen.o loading.o warning1.o warning2.o
 
 #---------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
@@ -159,7 +159,7 @@ topscreen.s topscreen.h : topscreen.png
 pdev_tbg0.s pdev_tbg0.h : pdev_tbg0.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
 
-pdev_bg0.s pdev_bg0.h : pdev_bg0.png
+logoscreen.s logoscreen.h : logoscreen.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
 
 loading.s loading.h : loading.png

@@ -1,5 +1,5 @@
 /******************************************************************************
-*  Hachibitto Z80 CPU 
+*  Vroom-DS Z80 CPU 
 *
 * Note: Most of this file is from the ColEm emulator core by Marat Fayzullin
 *       but heavily modified for specific NDS use. If you want to use this
@@ -169,7 +169,7 @@ case DEC_E:    M_DEC(CPU.DE.B.l);break;
 case DEC_H:    M_DEC(CPU.HL.B.h);break;
 case DEC_L:    M_DEC(CPU.HL.B.l);break;
 case DEC_A:    M_DEC(CPU.AF.B.h);break;
-case DEC_xHL:  I=RdZ80(CPU.HL.W);M_DEC(I);WrZ80f(CPU.HL.W,I);break;
+case DEC_xHL:  I=RdZ80(CPU.HL.W);M_DEC(I);WrZ80(CPU.HL.W,I);break;
 
 case INC_B:    M_INC(CPU.BC.B.h);break;
 case INC_C:    M_INC(CPU.BC.B.l);break;
@@ -178,7 +178,7 @@ case INC_E:    M_INC(CPU.DE.B.l);break;
 case INC_H:    M_INC(CPU.HL.B.h);break;
 case INC_L:    M_INC(CPU.HL.B.l);break;
 case INC_A:    M_INC(CPU.AF.B.h);break;
-case INC_xHL:  I=RdZ80(CPU.HL.W);M_INC(I);WrZ80f(CPU.HL.W,I);break;
+case INC_xHL:  I=RdZ80(CPU.HL.W);M_INC(I);WrZ80(CPU.HL.W,I);break;
 
 case RLCA:
   I=CPU.AF.B.h&0x80? C_FLAG:0;
@@ -228,11 +228,10 @@ case RET:  M_RET;break;
 case SCF:  S(C_FLAG);R(N_FLAG|H_FLAG);break;
 case CPL:  CPU.AF.B.h=~CPU.AF.B.h;S(N_FLAG|H_FLAG);break;
 case NOP:  break;
-case OUTA: I=OpZ80(CPU.PC.W++);OutZ80(I|(CPU.AF.W&0xFF00),CPU.AF.B.h);break;
-case INA:  I=OpZ80(CPU.PC.W++);CPU.AF.B.h=InZ80(I|(CPU.AF.W&0xFF00));break;
+case OUTA: I=OpZ80(CPU.PC.W++);OutZ80(I,CPU.AF.B.h);break;
+case INA:  I=OpZ80(CPU.PC.W++);CPU.AF.B.h=InZ80(I);break;
 
 case HALT:
-  halt_counter++;
   CPU.PC.W--;
   CPU.IFF|=IFF_HALT;
   CPU.IBackup=0;
@@ -274,7 +273,7 @@ case LD_E_B:   CPU.DE.B.l=CPU.BC.B.h;break;
 case LD_H_B:   CPU.HL.B.h=CPU.BC.B.h;break;
 case LD_L_B:   CPU.HL.B.l=CPU.BC.B.h;break;
 case LD_A_B:   CPU.AF.B.h=CPU.BC.B.h;break;
-case LD_xHL_B: WrZ80f(CPU.HL.W,CPU.BC.B.h);break;
+case LD_xHL_B: WrZ80(CPU.HL.W,CPU.BC.B.h);break;
 
 case LD_B_C:   CPU.BC.B.h=CPU.BC.B.l;break;
 case LD_C_C:   CPU.BC.B.l=CPU.BC.B.l;break;
@@ -348,13 +347,13 @@ case LD_E_BYTE:   CPU.DE.B.l=OpZ80(CPU.PC.W++);break;
 case LD_H_BYTE:   CPU.HL.B.h=OpZ80(CPU.PC.W++);break;
 case LD_L_BYTE:   CPU.HL.B.l=OpZ80(CPU.PC.W++);break;
 case LD_A_BYTE:   CPU.AF.B.h=OpZ80(CPU.PC.W++);break;
-case LD_xHL_BYTE: WrZ80f(CPU.HL.W,OpZ80(CPU.PC.W++));break;
+case LD_xHL_BYTE: WrZ80(CPU.HL.W,OpZ80(CPU.PC.W++));break;
 
 case LD_xWORD_HL:
   J.B.l=OpZ80(CPU.PC.W++);
   J.B.h=OpZ80(CPU.PC.W++);
-  WrZ80f(J.W++,CPU.HL.B.l);
-  WrZ80f(J.W,CPU.HL.B.h);
+  WrZ80(J.W++,CPU.HL.B.l);
+  WrZ80(J.W,CPU.HL.B.h);
   break;
 
 case LD_HL_xWORD:
@@ -373,7 +372,7 @@ case LD_A_xWORD:
 case LD_xWORD_A:
   J.B.l=OpZ80(CPU.PC.W++);
   J.B.h=OpZ80(CPU.PC.W++);
-  WrZ80f(J.W,CPU.AF.B.h);
+  WrZ80(J.W,CPU.AF.B.h);
   break;
 
 case EX_HL_xSP:

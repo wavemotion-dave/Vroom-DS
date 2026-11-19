@@ -67,7 +67,7 @@ volatile u8 pcm_sample_delay_frames __attribute__((section(".dtcm"))) = 0;
 volatile u8 pcm_sample_silence_frames __attribute__((section(".dtcm"))) = PCM_SAMPLE_SILENCE_FRAMES;
 volatile u8 pcm_sample_frame_active __attribute__((section(".dtcm"))) = 0;
 u8 pcm_sample_current __attribute__((section(".dtcm"))) = 128;
-s32 pcm_sample_filtered __attribute__((section(".dtcm"))) = 0;
+s32 pcm_sample_current_scaled __attribute__((section(".dtcm"))) = 0;
 
 // Provides the "PAC OPPL" string needed for some games to detect SRAM
 u8 FAKE_FMPAC[0x2000];
@@ -295,11 +295,11 @@ __attribute__((noinline)) void write_port_E5(u8 Value)
             // -------------------------------------------------------------------
             // Are we switching CPUs? Save registers and restore the incoming CPU.
             // -------------------------------------------------------------------
-            if (turbo_r_boost != s1990_is_r800)
+            if (turbo_r_mode != s1990_is_r800)
             {
-                SaveRegs(&saved_regs[turbo_r_boost]);      // departing CPU, old mode
+                SaveRegs(&saved_regs[turbo_r_mode]);      // departing CPU, old mode
                 LoadRegs(&saved_regs[s1990_is_r800]);      // arriving CPU
-                turbo_r_boost = s1990_is_r800;
+                turbo_r_mode = s1990_is_r800;
             }
             
             if ((old_reg6 ^ s1990_reg6) & 0x40)            // DRAM bit changed, either direction
@@ -707,7 +707,7 @@ __attribute__((noinline)) void read_joystick_or_mouse(void)
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, SCC, RTC, keyboard, etc.
 // --------------------------------------------------------------------
-ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
+ITCM_CODE __attribute__((optimize("no-jump-tables"))) unsigned char cpu_readport_msx(register u8 Port)
 {
   // These two are the most frequent so just handle them first...
   if (Port == 0x98) return RdData9938();               // VDP Data
@@ -1038,8 +1038,7 @@ void msx_slot_map_turboR(unsigned char Value)
 // -----------------------------------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip, Disk I/O, MSX2 Expanded Memory plus Slot Mapper $A8
 // -----------------------------------------------------------------------------------------------
-ITCM_CODE __attribute__((optimize("no-jump-tables")))
-void cpu_writeport_msx(register u8 Port,register unsigned char Value)
+ITCM_CODE __attribute__((optimize("no-jump-tables"))) void cpu_writeport_msx(register u8 Port,register unsigned char Value)
 {
     static u8 msx_music_register = 0;
 
@@ -1524,8 +1523,6 @@ void SCC_LegacyWrite(u8 value, u16 address)
 // ---------------------------------------------------------------
 void msx_restore_bios(void)
 {
-    memcpy(BIOS_Memory, TURBO_BIOS, 0x8000);
-
     // Slot 0 - BIOS is mapped in to start...
     MemoryMap[0] = TURBO_BIOS + 0x0000 - 0x0000;
     MemoryMap[1] = TURBO_BIOS + 0x2000 - 0x2000;
@@ -1557,12 +1554,12 @@ void msx_reset(void)
     pcm_sample_silence_frames = PCM_SAMPLE_SILENCE_FRAMES;
     pcm_sample_frame_active = 0;
     pcm_sample_current = 128;
-    pcm_sample_filtered = 0;
+    pcm_sample_current_scaled = 0;
     s1990_is_r800 = 0;
     s1990_reg6 = 0x60;
     s1990_reg_idx = 0;
     s1990_reg5 = 0;
-    turbo_r_boost = 0;
+    turbo_r_mode = 0;
     msx_music_capable_game = 0;
     special_memory_access = 0x00;
     msx_music_writes = 0;
@@ -1588,7 +1585,10 @@ void msx_reset(void)
     memset(saved_regs, 0x00, sizeof(saved_regs));
     saved_regs[0].SP.W = 0xF000;
     saved_regs[1].SP.W = 0xF000;
-
+    
+    memset(SpecialPage, 0x00, sizeof(SpecialPage));
+    memset(WriteSlow, 0x00, sizeof(WriteSlow));
+    
     // -------------------------------------------------
     // If a disk was part of the setup, load it now...
     // -------------------------------------------------

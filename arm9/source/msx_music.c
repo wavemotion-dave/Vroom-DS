@@ -847,16 +847,16 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
     return carrier >> (12 - myConfig.ymBalance);
 }
 
-#define MAX_PCM_GAP 4096
-inline s32 PCM_MixSample(void)
+inline __attribute__((always_inline)) s32 PCM_MixSample(void)
 {
     if (!pcm_sample_delay_frames && pcm_sample_read != pcm_sample_write)
     {
         pcm_sample_current = pcm_samples[pcm_sample_read++];
         pcm_sample_read &= PCM_SAMPLE_BUFFER_MASK;
+        pcm_sample_current_scaled = ((s32)pcm_sample_current - 128) * 128;
     }
 
-    return ((s32)pcm_sample_current - 128) * 128;
+    return pcm_sample_current_scaled;
 }
 
 // -------------------------------------------------------------------------
@@ -911,6 +911,8 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
             YM_HeldMelodicSample = melodicSample;
         }
         YM_HalfRatePhase ^= 1;
+        
+        u32 gtick = !(i & 3);
 
         /*
          * Rhythm
@@ -924,10 +926,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
             /* Bass Drum */
             if (bd->osc.gain != 0)
             {
-                YM_UpdateGain(
-                    &bd->osc,
-                    0,
-                    YM_PERCUSSION_RELEASE_STEP);
+                if (gtick) YM_UpdateGain( &bd->osc, 0, YM_PERCUSSION_RELEASE_STEP << 2);
 
                 if (bd->osc.gain != 0)
                 {
@@ -946,10 +945,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
             /* Tom-Tom */
             if (tt->osc.gain != 0)
             {
-                YM_UpdateGain(
-                    &tt->osc,
-                    0,
-                    YM_PERCUSSION_RELEASE_STEP);
+                if (gtick) YM_UpdateGain(&tt->osc, 0, YM_PERCUSSION_RELEASE_STEP << 2);
 
                 if (tt->osc.gain != 0)
                 {
@@ -1001,10 +997,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 /* Hi-Hat */
                 if (hs->osc.gain != 0)
                 {
-                    YM_UpdateGain(
-                        &hs->osc,
-                        0,
-                        YM_PERCUSSION_RELEASE_STEP);
+                    if (gtick) YM_UpdateGain(&hs->osc, 0, YM_PERCUSSION_RELEASE_STEP<<2);
 
                     if (hs->osc.gain != 0)
                     {
@@ -1032,10 +1025,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 /* Snare Drum: preserve existing tuning */
                 if (chip->rhythmSD.gain != 0)
                 {
-                    YM_UpdateGain(
-                        &chip->rhythmSD,
-                        0,
-                        2000);
+                    if (gtick) YM_UpdateGain(&chip->rhythmSD, 0, YM_PERCUSSION_RELEASE_STEP<<2);
 
                     if (chip->rhythmSD.gain != 0)
                     {
@@ -1063,10 +1053,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 /* Top Cymbal */
                 if (chip->rhythmTCY.gain != 0)
                 {
-                    YM_UpdateGain(
-                        &chip->rhythmTCY,
-                        0,
-                        YM_PERCUSSION_RELEASE_STEP);
+                    if (gtick) YM_UpdateGain(&chip->rhythmTCY, 0, YM_PERCUSSION_RELEASE_STEP<<2);
 
                     if (chip->rhythmTCY.gain != 0)
                     {
@@ -1093,11 +1080,10 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
         /* Mix one synthesized sample into the existing output buffer. */
         s32 mixed = ((s32)dest[i]) + sample;
         
-        // -----------------------------------------------------------------
-        // We should be clamping the result but we need the speed and
-        // we've not seen any actual clipping yet so we take our chances...
-        // -----------------------------------------------------------------
-
+        // Clamp the output if needed...
+        if (mixed > 32767) mixed = 32767;
+        else if (mixed < -32768) mixed = -32768;
+        
         dest[i] = (s16)mixed;
     }
 }
