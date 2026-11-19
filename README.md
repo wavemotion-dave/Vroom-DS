@@ -60,6 +60,7 @@ are some real gems for the turbo-R in that small group. I'll highlight 10 of the
 | ![Slot Map](images/multiplex.bmp)  | Multi-Plex. They said parallax scrolling was too difficult to pull off during gameplay. This fast horizontal shooter proves them wrong. |
 | ![Slot Map](images/paradream.bmp)  | Paradream. A solid Parodius-em-up shooter that has beautiful color and level presentation.|
 | ![Slot Map](images/seed_dragon.bmp)  | Seed of Dragon. One of the few games that features voices done via PCM. The semi-recent English Translation even translates the voices into English. |
+| ![Slot Map](images/space_panic.bmp)  | Space Panic. A bit of an unusual take on the side-scroller shooter... it's almost like a vertical shooter turned sideways as these large enemies come flying into view from the right and you've got not only your blaster, but another object you can fire at to bounce around and wreck havoc. |
 | ![Slot Map](images/treasure_babylon.bmp)  | Treasure of Babylon. Another puzzle game that for some reason I really dig - slow paced so you can just think ahead.|
 | ![Slot Map](images/moonlight.bmp)  | Moonlight Saga. Along with Illusion City, often considered one of the very best the turbo-R has to offer. A colorful game that will please RPG fans.|
 | ![Slot Map](images/stage11.bmp)  | Stage 11 Kai. No idea why this isn't just an MSX1 game but it's still quite good battling a single boss trying to outlast it.|
