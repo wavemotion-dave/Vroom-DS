@@ -1,4 +1,4 @@
-# Vroom-DS - MSX Turbo-R Emulator for the DSi/XL/LL
+# Vroom-DS - MSX turbo-R Emulator for the DSi/XL/LL
 
 Requires a DSi/XL/LL and will NOT run in DS-Lite or 'Compatibility' mode. The game
 will check to make sure you have the needed processing power and RAM to run the game.
@@ -45,11 +45,23 @@ The Vroom-DS emulator is offered as-is, without any warranty.
 
 Credit to @PantheonMusic - Opening "Fast Pace Dramatic Score" music
 
+How is this different than Hachibitto?
+-----------------------
+
+This one plays turbo-R games and Hachibitto doesn't :)
+
+Okay... Hachibitto strives for accuracy across the MSX/MSX2/MSX2+ line. As such, there simply isn't enough processing power on the DS/DSi to handle turbo-R games that run much faster (although the clock
+rate of the R800 turbo-R processor is only double that of the Z80, the streamline designed allows many instructions to run in only 1 or 2 cycles - thus providing the R800 with an almost 5-6x effective
+speed of the Z80 though with some caveats for I/O wait states). So Vroom-DS makes a ton of trade-offs... unsafe CPU optimizations and trades VDP speed for CPU speed (the VDP is largely crippled anyway
+due to the faster CPU having to wait for it quite often). So this emulator is not the one you should use for 98% of your MSX needs - Hachibitto has support for the core systems, save states, boxart support,
+advanced configuration settings, true 60Hz frame sync (to reduce graphical artifacts) and a bunch of other stuff that Vroom-DS lacks. But if you want to see what the turbo-R is all about then Vroom-DS will
+get the job done. Barely.
+
 What is Worth Playing
 -----------------------
 
 There aren't more than about 40 games total for the turbo-R. It was well past twilight for the MSX systems 
-when it came out and most developers had moved on to other systems (Amiga, PC, SNES, Genesis, etc). But there
+when the turbo-R came out and most developers had moved on to other systems (Amiga, PC, SNES, Genesis, etc). But there
 are some real gems for the turbo-R in that small group. I'll highlight 10 of the games that I really enjoyed.
 
 | Game     | Description |
@@ -74,12 +86,19 @@ Known Issues :
 -----------------------
 * Speed is not fully accurate. It's the best I could do on the little handheld... some games play just fine and others will have slowdown.
 * The MSX Translations version of Illusion City only runs in the 4MB ASC16X ROM version (which is more convenient anyway). You can use Flash or SRAM to save progress.
-* Daraiayu Taikenban hits this emulation HARD and as such is glitchy. PCM is enabled but due to the slowdown, it doesn't sound very good.
-* STG Special has major graphical glitches happening in the score area. Reason unknown but probably inaccurate R800 timing.
-* Don't try to run non-Turbo-R games on this thing... most of the MSX mappers are not present and SCC emulation is missing. Use Hachibitto for your general MSX emulation needs - this is to play around with Turbo R games.
+* Daraiayu Taikenban hits this emulation HARD and as such is a bit glitchy. PCM is enabled but due to the slowdown, it doesn't sound great.
+* STG Special (which must be started using the DODONT.COM program... not the STG.COM program) has some graphical glitching during gameplay. Likely timing related.
+* Don't try to run non-Turbo-R games on this thing... most of the MSX mappers are not present. Use Hachibitto for your general MSX emulation needs - this is to play around with turbo-R games.
 
 Version History :
 -----------------------
+Version 1.0 - 20-Nov-2026 by wavemotion-dave
+* Last bit of CPU optimization to try and squeeze one more frame of performance.
+* Added one more level of CPU boost - unsure if it will be needed, but better safe than sorry.
+* Fix for screenshot not saving/preserving memory used. Could crash any 4MB cart being played.
+* Fix for Alpha-Blend on Screen 7 (was sometimes coming out of the blending mode).
+* Cleanup and commenting across the board.
+
 Version 0.9 - 18-Nov-2026 by wavemotion-dave
 * Absolute max optimization of CPU read/write throughput. We now sacrifice VDP speed for CPU speed since on the turbo-R that's the bottleneck.
 * Fix for a few turbo-R games that were not running at the optimal settings.
@@ -96,7 +115,7 @@ Version 0.8 - 15-Nov-2026 by wavemotion-dave
 Version 0.7 - 15-Nov-2026 by wavemotion-dave
 * Real R800 timing and actual CPU context switching for improved accuracy.
 * PCM buffer so voice samples sound better.
-* SCC added back from Hachibitto so games like Goonies R Enough with voice now work as does games like Nemesis 3 with Turbo R enhancements (no slowdown, smooth scroll, etc).
+* SCC added back from Hachibitto so games like Goonies R Enough with voice now work as does games like Nemesis 3 with turbo-R enhancements (no slowdown, smooth scroll, etc).
 * New Turbo 'Flame' icon when running in Turbo-R native R800 mode.
 * Lots of other bug fixes and improvements as time permitted.
 

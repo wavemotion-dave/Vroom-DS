@@ -52,9 +52,7 @@
 #define FlipEvenOdd   (VDP[9]&0x04)   /* Flip even/odd pages */
 #define OddPage       (frame_number&1)
 #define VAdjust       (-((signed char)(VDP[18])>>4))
-// R#18 bits 3-0 are a signed nibble where the decoded shift is -nibble. Positive (picture moves right) only when
-// bit 3 is set. Negative shifts would just crop the left edge on the DS (no overscan to show them in), so ignore them.
-#define HAdjust       ((VDP[18] & 0x08) ? (16 - (VDP[18] & 0x0F)) : 0)
+#define HAdjust       (-((signed char)((VDP[18])<<4)>>4))
 
 extern byte VDP_Memory[0x20000];
 extern u8 VDP[64];

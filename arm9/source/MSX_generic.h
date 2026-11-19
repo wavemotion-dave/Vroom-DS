@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 512
-#define CONFIG_VER                  0x0008
+#define CONFIG_VER                  0x0009
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -113,6 +113,7 @@ extern s32 pcm_sample_current_scaled;
 #define CPU_BOOST_SLOW              0       // A bit slower than normal
 #define CPU_BOOST_MED               1       // Roughly normal
 #define CPU_BOOST_FAST              2       // A bit faster than normal
+#define CPU_BOOST_MAX               3       // The fastest we can support
 
 #define FDC_WD                      0       // Older WD2793 driver
 #define FDC_TOSH                    1       // MSX Turbo-R Toshiba Driver

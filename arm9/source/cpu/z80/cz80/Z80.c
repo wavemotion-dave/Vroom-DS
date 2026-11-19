@@ -60,6 +60,18 @@ static inline  __attribute__((always_inline))  void WrZ80(word A, byte V)
     else MemoryMap[A >> 13][A] = V;
 }
 
+// --------------------------------------------------------------------------
+// We're taking the chance that stack is in RAM (or at least in a normally 
+// "write-mapped" area of memory). And we're using 32-bit counters for stack
+// which is not technically correct - well behaved games should be okay with
+// this handling and we need every bit of speed for the turbo-R emulation.
+// --------------------------------------------------------------------------
+static inline  __attribute__((always_inline))  void WrZ80_stack(u32 A, byte V)
+{
+    MemoryMap[A >> 13][A] = V;
+}
+
+
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)
 #define     InZ80(P)         cpu_readport_msx(P)
 
@@ -114,11 +126,11 @@ static inline  __attribute__((always_inline))  void WrZ80(word A, byte V)
 #define M_POP(Rg)      \
   CPU.Rg.B.l=OpZ80(CPU.SP.W++);CPU.Rg.B.h=OpZ80(CPU.SP.W++)
 #define M_PUSH(Rg)     \
-  WrZ80(--CPU.SP.W,CPU.Rg.B.h);WrZ80(--CPU.SP.W,CPU.Rg.B.l)
+  WrZ80_stack(--CPU.SP.W,CPU.Rg.B.h);WrZ80_stack(--CPU.SP.W,CPU.Rg.B.l)
 
 #define M_CALL         \
   J.B.l=OpZ80(CPU.PC.W++);J.B.h=OpZ80(CPU.PC.W++);         \
-  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80(--CPU.SP.W,CPU.PC.B.l); \
+  WrZ80_stack(--CPU.SP.W,CPU.PC.B.h);WrZ80_stack(--CPU.SP.W,CPU.PC.B.l); \
   CPU.PC.W=J.W; \
   JumpZ80(J.W)
 
@@ -127,7 +139,7 @@ static inline  __attribute__((always_inline))  void WrZ80(word A, byte V)
 #define M_RET CPU.PC.B.l=OpZ80(CPU.SP.W++);CPU.PC.B.h=OpZ80(CPU.SP.W++);JumpZ80(CPU.PC.W)
 
 #define M_RST(Ad)      \
-  WrZ80(--CPU.SP.W,CPU.PC.B.h);WrZ80(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
+  WrZ80_stack(--CPU.SP.W,CPU.PC.B.h);WrZ80_stack(--CPU.SP.W,CPU.PC.B.l);CPU.PC.W=Ad;JumpZ80(Ad)
 
 #define M_LDWORD(Rg)   \
   CPU.Rg.B.l=OpZ80(CPU.PC.W++);CPU.Rg.B.h=OpZ80(CPU.PC.W++)

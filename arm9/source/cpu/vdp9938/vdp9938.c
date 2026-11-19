@@ -27,7 +27,29 @@
 // -------------------------------------------------------------------------
 u8 *XBuf[2] = {(u8 *)0x06000000, (u8 *)0x06020000};
 
-static __attribute__((noinline)) void ApplyLeftMask(void);
+#define LS_BASE 64   // generous margin both sides for HAdjust (~±8) + sprite draw overshoot (±32)
+static u8 LineScratch[400] ALIGN(32) __attribute__((section(".dtcm")));
+
+
+// R#25 bit 1 (MSK): leftmost 8 pixels show the backdrop color.
+// Called after sprites so the sprites are masked too.
+static inline __attribute__((always_inline)) void ApplyLeftMask(void)
+{
+    if (VDP[25] & 0x02)
+    {
+        u32 c = 0x10101010;
+        u32 *p32 = (u32*)(LineScratch + LS_BASE);
+        p32[0] = c;
+        
+        // If HAdjust is negative, we've already cropped some pixels off the screen...
+        // This keeps some games from having their score area pixel-eroded.
+        if (HAdjust > -2)
+        {
+            p32[1] = c;
+        }
+    }
+}
+
 
 u32 __attribute__((section(".dtcm"))) last_vdp_access = 999;
 inline __attribute__((always_inline)) void VDP9938WaitForR800Access(void)
@@ -228,7 +250,7 @@ void BuildLutTablehh(void)
 // possible interrupt requests. One is for the VSync at the end of a
 // frame and the other is the VDP Line Interrupt.
 // ----------------------------------------------------------------------
-ITCM_CODE void SetVDPIRQ(u8 bit, u8 set)
+void SetVDPIRQ(u8 bit, u8 set)
 {
     if (set) msx_irq_pending |= bit;
     else     msx_irq_pending &= ~bit;
@@ -1513,9 +1535,6 @@ void RefreshLine3(u8 uY)
   }
 }
 
-#define LS_BASE 64   // generous margin both sides for HAdjust (~±8) + sprite draw overshoot (±32)
-static u8 LineScratch[400] ALIGN(32) __attribute__((section(".dtcm")));
-
 ITCM_CODE uint8_t *RefreshBorder(uint8_t Y)
 {
     int shift = HAdjust & ~1;   // even-only clamp - we only scroll in 2 pixel jumps which is not perfect but allows for faster rendering.
@@ -1571,20 +1590,6 @@ ITCM_CODE void CommitLine(u8 Y)
 static u8 ScrollRow[128] ALIGN(4) __attribute__((section(".dtcm")));   // Screen 5: rotated source row
 static u8 NameRow[36]    ALIGN(4) __attribute__((section(".dtcm")));   // Screen 4: rotated name table row
 
-// R#25 bit 1 (MSK): leftmost 8 pixels show the backdrop color.
-// Called after sprites so the sprites are masked too.
-static __attribute__((noinline)) void ApplyLeftMask(void)
-{
-    if (VDP[25] & 0x02)
-    {
-        u32 c = 0x10101010;
-        u32 *p32 = (u32*)(LineScratch + LS_BASE);
-        p32[0] = c;
-        p32[1] = c;
-    }
-}
-
-
 // 9-bit scroll position (0..511): background pixel shown at screen X=0
 static inline __attribute__((always_inline)) int HScrollRaw(void)
 {
@@ -1599,7 +1604,7 @@ static inline __attribute__((always_inline)) int HScrollStart(void)   // used by
 // ---------------------------------------------------------------------
 // This handles the V9958 horizontal scroll register magic for Screen 4
 // ---------------------------------------------------------------------
-u8 *HandlePageScrollScreen4(u8 *T, u8 *P, uint8_t **Pbg, int *tiles, int *start)
+ITCM_CODE u8 *HandlePageScrollScreen4(u8 *T, u8 *P, uint8_t **Pbg, int *tiles, int *start)
 {
     int page = 0;
 
@@ -1690,7 +1695,7 @@ u8 *HandlePageScrollScreen4(u8 *T, u8 *P, uint8_t **Pbg, int *tiles, int *start)
         p1 = bg ^ (diff & Screen2NibbleMask[Kb & 0x0F]);                       \
     }
 
-void RefreshLine4(uint8_t Y)
+ITCM_CODE void RefreshLine4(uint8_t Y)
 {
     DEBUG_REFRESH(4);
 
@@ -1782,7 +1787,7 @@ void RefreshLine4(uint8_t Y)
 // ---------------------------------------------------------------------
 // This handles the V9958 horizontal scroll register magic for Screen 5
 // ---------------------------------------------------------------------
-const u8 *HandlePageScrollScreen5(const u8 *src)
+ITCM_CODE const u8 *HandlePageScrollScreen5(const u8 *src)
 {
     if (VDP[25] & 1)
     {
@@ -3347,7 +3352,7 @@ void RefereshPreviousLine(void)
 ITCM_CODE void Loop9938(void)
 {
   // 1. Get the 0-indexed display scanline relative to the active display area
-  int scanline = CurLine - VDP9938_START_LINE;
+  int scanline = (CurLine + (turbo_r_mode ? 1:0)) - VDP9938_START_LINE;
 
   // 2. Perform the absolute V9938 match check (accounts for vertical scroll R#23)
   // VDP[23] is the Vertical Scroll Offset, VDP[19] is the Line Interrupt Register

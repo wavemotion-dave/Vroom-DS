@@ -282,7 +282,7 @@ __attribute__((noinline)) mm_word ClickRemoval(mm_word len, mm_addr dest)
         else if (sample < -32767) sample = -32767;
         mix1[15] = sample;
     }
-    
+
     int target = mix1[15];          // This is what we are smoothing towards
 
     s16 *p = (s16 *)dest;
@@ -322,12 +322,12 @@ void handle_scc_sound(mm_word len, mm_addr dest)
         s32 diff = (s32)*p - smoothed;
         if (diff > MAX_STEP) diff = MAX_STEP;
         else if (diff < -MAX_STEP) diff = -MAX_STEP;
-        
+
         smoothed += diff;
         *p++ = (s16)smoothed;
     }
     ay_smoothed = smoothed;
-    
+
     SCCMixer(len, mixer, &mySCC); // Get SCC samples
 
     // ------------------------------------------------------------------------
@@ -338,7 +338,7 @@ void handle_scc_sound(mm_word len, mm_addr dest)
     for (int i = 0; i < len; i++)
     {
         s32 combined = output[i] + mixer[i];
-        
+
         if (myConfig.pcm)
         {
             combined += PCM_MixSample();
@@ -395,7 +395,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
 
         // Always grab AY samples...
         ay38910Mixer(len, dest, &myAY);
-        
+
         // Then it's either MSX-MUSIC or SCC to mix in...
         if (msx_music_capable_game)
         {
@@ -409,7 +409,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         {
             handle_pcm_sound(len, dest);
         }
-        
+
         last_sample = ((s16 *)dest)[len - 1];
     }
 
@@ -515,7 +515,7 @@ void ResetMSX(void)
     Reset9938(); // Reset the video chip
 
     sound_chip_reset(); // Reset the SN, AY and SCC chips
-    
+
     setup_emulation_NoBlend(); // Put us back to normal 8-bit mode
 
     Z80_Interface_Reset(); // Reset the Z80 Interface
@@ -525,7 +525,7 @@ void ResetMSX(void)
 
     msx_caps_lock = 0; // MSX CAPS lock off
     msx_kana_lock = 0; // MSX KANA lock off
-    
+
     dampen_turbo_icon = 0;
 
     zoom_screen = 0; // Assume no zoom to start
@@ -535,7 +535,7 @@ void ResetMSX(void)
     msx_restore_bios(); // Put the BIOS back in place and point to it
 
     keyMapType = 0; // If we go back into options
-    
+
     // -----------------------------------------------------------
     // Timer 1 is used to time frame-to-frame of actual emulation
     // -----------------------------------------------------------
@@ -638,7 +638,7 @@ void ShowDebugZ80(void)
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "%d Free", getMemFree());
     DSPrint(0, idx++, 7, tmpStr);
-    
+
     idx = 6;
     for (u8 i = 0; i < 16; i++)
     {
@@ -669,7 +669,7 @@ void DisplayStatusLine(void)
     else if (flash_show_status)
     {
         DSPrint(28, 0, 0, "  ");
-        DSPrint(28, 1, 0, "  ");            
+        DSPrint(28, 1, 0, "  ");
         DSPrint(30, 0, 2, "?"); // Show Flash Write icon
         DSPrint(30, 1, 2, "_"); // Show Flash Write icon
         DSPrint(31, 0, 0, " ");
@@ -684,7 +684,7 @@ void DisplayStatusLine(void)
         if (io_show_status == 8) // Disk Write
         {
             DSPrint(28, 0, 0, " ");
-            DSPrint(28, 1, 0, " ");            
+            DSPrint(28, 1, 0, " ");
             DSPrint(29, 0, 2, "678"); // Show Disk icon
             DSPrint(29, 1, 2, "VWX"); // Show Disk icon
             io_show_status = 6;       // Show icon briefly
@@ -696,7 +696,7 @@ void DisplayStatusLine(void)
         else if (io_show_status == 7) // Disk Read
         {
             DSPrint(28, 0, 0, " ");
-            DSPrint(28, 1, 0, " ");            
+            DSPrint(28, 1, 0, " ");
             DSPrint(29, 0, 2, "345"); // Show Disk icon
             DSPrint(29, 1, 2, "STU"); // Show Disk icon
             io_show_status = 6;       // Show icon briefly
@@ -719,7 +719,7 @@ void DisplayStatusLine(void)
         DSPrint(28, 0, 0, "    ");
         DSPrint(28, 1, 0, "    ");
     }
-    
+
     // If not showing FPS, show the Turbo Icon
     if (!myGlobalConfig.showFPS)
     {
@@ -1350,6 +1350,7 @@ void VroomDSRunEmu(void)
                 TIMER2_DATA = 0;
                 TIMER2_CR = TIMER_ENABLE | TIMER_DIV_1024;
                 timingFrames = 0;
+                drawn_frame_number = 0;
                 DisplayStatusLine(); // Every half second
             }
             else if (timingFrames == 30) // Every half second
@@ -1363,7 +1364,7 @@ void VroomDSRunEmu(void)
             // ----------------------------------------------------------------------------
             while (TIMER2_DATA < (546*(timingFrames+1)))
             {
-                if (skip_render && timingFrames < 59) break;
+                if (skip_render && timingFrames < 59) break; // If we're skipping a frame, just move on
             }
 
             // If the Z80 Debugger is enabled, call it every frame. Expensive but we need the debug!
@@ -1371,10 +1372,9 @@ void VroomDSRunEmu(void)
             {
                 ShowDebugZ80();
             }
-            
+
             // Get ready for the next frame...
             skip_render = 0;    // Assume we draw the frame until proven otherwise
-            render_blended = 0; // Assume no blend... Checked directly below.
 
             // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
             if (ScrMode == 7)
@@ -1383,13 +1383,11 @@ void VroomDSRunEmu(void)
                 {
                     zoom_screen = 1;
                 }
-                if (myConfig.frameSkip <= FS_LIGHT)
-                {
-                    render_blended = 1; // We Alpha Blend the A/B pixels in Screen 7
-                }
+                render_blended = 1; // We Alpha Blend the A/B pixels in Screen 7
             }
             else if (ScrMode == 9) // 80 Column Mode (480px)
             {
+                render_blended = (myConfig.scaleScreen) ? 1 : 0;
                 if (!zoom_screen)
                 {
                     zoom_screen = 2; // Default to zoomed
@@ -1397,23 +1395,17 @@ void VroomDSRunEmu(void)
             }
             else
             {
+                render_blended = (myConfig.scaleScreen) ? 1 : 0;
                 zoom_screen = 0;
             }
-            
-            // ------------------------------------------------------------------------------------------------------------
-            // With a compressed screen, we use the A/B buffers to blur the display so compressed text is a bit cleaner...
-            // ------------------------------------------------------------------------------------------------------------
-            if (myConfig.scaleScreen)
-            {
-                render_blended = 1;
-            }
-            
+
             // --------------------------------------------------------------------------------------
             // If blending has changed... we might need to enable/disable the Alpha Blend on the DSi
             // --------------------------------------------------------------------------------------
             if (old_blended != render_blended)
             {
                 old_blended = render_blended;
+                bMainMenuActive = 1;
                 if (render_blended)
                 {
                     setup_emulation_Blend();
@@ -1422,6 +1414,7 @@ void VroomDSRunEmu(void)
                 {
                     setup_emulation_NoBlend();
                 }
+                bMainMenuActive = 0;
             }
 
             // ---------------------------------------------------------------------------------
@@ -1958,7 +1951,7 @@ void VroomDSRunEmu(void)
             // Accumulate all bits above into the Joystick State var...
             // ---------------------------------------------------------
             JoyState = JoyStickMap;
-            
+
             // ---------------------------------------------------------------------------------------------------
             // Zone Terra requires a direct press to get into gameplay before the title screen (freeze otherwise).
             // ---------------------------------------------------------------------------------------------------
@@ -2064,8 +2057,8 @@ void setup_emulation_NoBlend(void)
     REG_BG3PD = (1 << 8);
     REG_BG3X = 0;
     REG_BG3Y = 0;
-    
-    // Clear old tile/map data out of bank A and B. 
+
+    // Clear old tile/map data out of bank A and B.
     dmaFillWords(0, (void *)BG_BMP_RAM(0), 256 * 256 * 2);
     dmaFillWords(0, (void *)BG_BMP_RAM(8), 256 * 256 * 2);
 }
@@ -2100,8 +2093,8 @@ void setup_emulation_Blend(void)
     REG_BG3PD = (1 << 8);
     REG_BG3X = 0;
     REG_BG3Y = 0;
-    
-    // Clear old tile/map data out of bank A and B. 
+
+    // Clear old tile/map data out of bank A and B.
     dmaFillWords(0, (void *)BG_BMP_RAM(0), 256 * 256 * 2);
     dmaFillWords(0, (void *)BG_BMP_RAM(8), 256 * 256 * 2);
 }
@@ -2201,7 +2194,7 @@ void BottomScreenKeypad(void)
 
     DisplayStatusLine();
 }
- 
+
 /*********************************************************************************
  * Init CPU for the current game
  ********************************************************************************/
@@ -2267,7 +2260,7 @@ ITCM_CODE void irqVBlank(void)
             FlipScreenBuffer(flip_to);
             ready_to_flip = 0;
         }
-        
+
         // ---------------------------------------------------------------------
         // Are we in 192 scanline mode? If so, we don't need ANY screen panning.
         // ---------------------------------------------------------------------
@@ -2313,7 +2306,7 @@ ITCM_CODE void irqVBlank(void)
 }
 
 // -------------------------------------------------------------------------------
-// Two warnings... type 1 is we are not a DSi and don't have the CPU horsepower 
+// Two warnings... type 1 is we are not a DSi and don't have the CPU horsepower
 // to run this emulation and type 2 is missing some of the firmware files needed.
 // -------------------------------------------------------------------------------
 void ShowWarning(u8 type)
@@ -2366,7 +2359,7 @@ int main(int argc, char **argv)
         RAM_Memory    = malloc(RAM_SIZE_KB      * 1024);
         DISK_Memory   = malloc(MAX_DISK_SIZE_KB * 1024);
         DISK_Memory1  = malloc(MAX_DISK_SIZE_KB * 1024);
-        
+
         //Component             Offset      Size    End
         //====================  ========    =====   =========
         //Opening ROM	        0x048000	16 KB	0x04BFFF
@@ -2381,20 +2374,20 @@ int main(int argc, char **argv)
         {
             fseek(fp, 0x048000, SEEK_SET);
             fread(TURBO_OPENING, 1, 0x4000, fp);
-            
+
             // And patch the logo timing
             TURBO_OPENING[0x3A20] = 0x3E;
             TURBO_OPENING[0x3A21] = 0x20;
             TURBO_OPENING[0x3A22] = 0x3D;
             TURBO_OPENING[0x3A23] = 0xF0;
             TURBO_OPENING[0x3A24] = 0xFD;
-            
+
             fseek(fp, 0x050000, SEEK_SET);
             fread(TURBO_BIOS, 1, 0x8000, fp);
 
             fseek(fp, 0x060000, SEEK_SET);
             fread(TURBO_DOS23, 1, 0x10000, fp);
-            
+
             fseek(fp, 0x070000, SEEK_SET);
             fread(TURBO_SUB, 1, 0x4000, fp);
 
@@ -2405,7 +2398,7 @@ int main(int argc, char **argv)
             fread(TURBO_MSXMUSIC, 1, 0x4000, fp);
 
             fclose(fp);
-            
+
             fp = fopen("/roms/bios/hb-f1xdj_kanjifont.rom", "rb");
             if (!fp) fp = fopen("/roms/bios/kanjifont.rom", "rb");
             if (fp)
@@ -2430,7 +2423,7 @@ int main(int argc, char **argv)
             {
                 bShowWarning = 1;
             }
-            
+
             // Make sure the DOS 2.2 is one of the 4 that we know to work...
             u32 dos2_crc = getCRC32(TURBO_DOS22, 64*1024);
             if ((dos2_crc != 0x1c430991) && (dos2_crc != 0x47eea028) && (dos2_crc != 0x845f5ab6) && (dos2_crc != 0x8687c4f1))
@@ -2442,7 +2435,7 @@ int main(int argc, char **argv)
         {
             bShowWarning = 1;
         }
-        
+
         if (bShowWarning)
         {
             ShowWarning(2);
@@ -2451,7 +2444,7 @@ int main(int argc, char **argv)
                 WAITVBL;
             }
         }
-        
+
     }
     else // We can't support older DS-Lite/Phat for Turbo-R emulation
     {
@@ -2534,7 +2527,7 @@ int main(int argc, char **argv)
 
             //  Choose carts and disks and options
             VroomDSMainMenu();
-            
+
             //  Run Machine
             VroomDSInitCPU();
             VroomDSRunEmu();
@@ -2697,6 +2690,10 @@ __attribute__((noinline)) void FlipScreenBuffer(u8 flip_buffer)
         u32 d = REG_DISPCNT & ~(DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
         REG_DISPCNT = d | (flip_buffer ? DISPLAY_BG3_ACTIVE : DISPLAY_BG2_ACTIVE);
     }
+    else // Show both as we are alpha blending
+    {
+        REG_DISPCNT = REG_DISPCNT | (DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -2763,7 +2760,7 @@ char *GetMasterPath(void)
 void LoadGameIntoMedia(u8 media_id, char *filename)
 {
     ShowLoading(); // Put up a loading screen so user is aware...
-    
+
     memset(flashDirtyBlocks, 0x00, sizeof(flashDirtyBlocks));   // Ensure flash blocks are clear (for games that have writable flash)
 
     // Save the directory in which this file was found...
@@ -2831,14 +2828,14 @@ u32 LoopZ80(void)
 {
     static const u32 cpu_adjust[4] = {0, 29, 45, 74};  // Roughly 3.58Mhz, 4.0MHz, 4.3MHz and 4.75Mhz
     static const u32 hsync_adjust[4] = {0, 7, 10, 21};
-    
+
     // Execute 1 scanline worth of CPU instructions
     u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit; // Default to Z80 timing
     H_BlankCycles = 54;
 
     // -----------------------------------------------------------------------------------
     // When we are in R800 mode, we boost the CPU clock and call the R800 CPU handler.
-    // We should be clocking at twice the normal Z80 frequency (3.58 MHz)- so this should 
+    // We should be clocking at twice the normal Z80 frequency (3.58 MHz)- so this should
     // be running at 7.16 MHz but the poor DSi/XL/LL can't handle that so the best we can
     // do is run the R800 at roughly 4 or 4.5 MHz give or take depending on configuration.
     // It's far from perfect but a surprising number of games will run fine at that speed.
@@ -2847,7 +2844,7 @@ u32 LoopZ80(void)
     {
         cycles_to_process += cpu_adjust[myConfig.cpuBoost];
         H_BlankCycles += hsync_adjust[myConfig.cpuBoost];
-        
+
         CPU.CycleDeficit = ExecR800(cycles_to_process);
     }
     else // Z80 handler
@@ -2865,7 +2862,7 @@ u32 LoopZ80(void)
 
     extern u16 turbo_timer;
     turbo_timer += 16;
-    
+
     extern u8 pcm_counter;
     pcm_counter++;
 
@@ -2889,7 +2886,7 @@ u32 LoopZ80(void)
             pcm_sample_write = nextWrite;
         }
     }
-    
+
     // Run the FDC engine
     LoopFDC();
 
@@ -2907,7 +2904,7 @@ u32 LoopZ80(void)
 
         if (((CurLine - 1) >= VDP9938_START_LINE) && ((CurLine - 1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
         {
-            mid_frame_interrupt = 3; // Wait 3 lines... then refresh 
+            mid_frame_interrupt = 3; // Wait 3 lines... then refresh
         }
     }
 

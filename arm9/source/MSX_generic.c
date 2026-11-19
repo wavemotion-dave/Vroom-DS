@@ -291,7 +291,7 @@ u8 showMessage(char *szCh1, char *szCh2)
 void LoadFavorites(void)
 {
     memset(myFavs, 0x00, sizeof(myFavs));
-    FILE *fp = fopen("/data/TurboR.fav", "rb");
+    FILE *fp = fopen("/data/Vroom-DS.fav", "rb");
     if (fp)
     {
         fread(&myFavs, sizeof(myFavs), 1, fp);
@@ -314,7 +314,7 @@ void SaveFavorites(void)
         mkdir("/data", 0777); // Doesn't exist - make it...
     }
 
-    FILE *fp = fopen("/data/TurboR.fav", "wb");
+    FILE *fp = fopen("/data/Vroom-DS.fav", "wb");
     if (fp)
     {
         fwrite(&myFavs, sizeof(myFavs), 1, fp);
@@ -873,13 +873,6 @@ u8 VroomDSChooseFile(u8 media_id, u8 allow_dir_change)
     while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B | KEY_R | KEY_L | KEY_UP | KEY_DOWN)) != 0)
         ;
 
-    // If we have used the screen for preview snaps... restore it
-    if (allow_dir_change)
-    {
-        extern void restore_lcd(void);
-        restore_lcd();
-    }
-
     return 0x01;
 }
 
@@ -1038,6 +1031,14 @@ void ApplyDatabaseTweaks(void)
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.fdc_driver     = FDC_TOSH;
         myConfig.pcm            = 1;
+    }
+
+    if (strstr(filename, "CRITERION"))
+    {
+        myConfig.frameSkip      = FS_LIGHT;
+        myConfig.fdc_driver     = FDC_TOSH;
+        myConfig.yOffset        = 20;
+        myConfig.splitRefresh   = 1;
     }
 
     if (strstr(filename, "ILLUSION") && strstr(filename, "CITY"))
@@ -1227,6 +1228,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "MECHANICAL") && strstr(filename, "BRAIN"))
     {
         myConfig.frameSkip      = FS_HEAVY;
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
     }
 
     if (strstr(filename, "MEJUUSA"))
@@ -1272,7 +1274,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "SEED") && strstr(filename, "DRAGON"))
     {
         myConfig.fdc_driver     = FDC_WD;
-        myConfig.frameSkip      = FS_HEAVY;
+        myConfig.frameSkip      = FS_LIGHT;
         myConfig.pcm            = 1;
     }
 
@@ -1294,6 +1296,7 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "S.T.G."))
     {
         myConfig.frameSkip      = FS_NONE;
+        myConfig.splitRefresh   = 2;
         MapCursors();
     }
 
@@ -1468,14 +1471,15 @@ const struct options_t Option_Table[1][20] =
         {"FRAMESKIP",       {"NONE", "LIGHT", "HEAVY"},                                                                                                                 &myConfig.frameSkip,         3},
         {"DPAD",            {"NORMAL", "DIAGONALS", "MOUSE", "SLIDE-N-GLIDE"},                                                                                          &myConfig.dpad,              4},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
+        {"SPLIT TIMING",    {"0 LINES", "1 LINE", "2 LINES"},                                                                                                           &myConfig.splitRefresh,      3},
         {"FDC DRIVER",      {"WD2973", "TC8566AF"},                                                                                                                     &myConfig.fdc_driver,        2},
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymBalance,         4},
         {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},
         {"PCM",             {"DISABLED", "ENABLED"},                                                                                                                    &myConfig.pcm,               2},
         {"DISK SOUND",      {"OFF", "ON"},                                                                                                                              &myGlobalConfig.bDiskSounds, 2},        
-        {"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
-        {"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
+        //{"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
+        //{"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},
     },
 };

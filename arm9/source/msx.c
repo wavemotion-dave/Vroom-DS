@@ -762,7 +762,7 @@ ITCM_CODE __attribute__((optimize("no-jump-tables"))) unsigned char cpu_readport
 u8 SpecialPage[256] __attribute__((section(".dtcm"), aligned(4))) = {0};
 u8 WriteSlow[256]   __attribute__((section(".dtcm"), aligned(4))) = {0};
 
-void UpdateSpecialPages(void)
+ITCM_CODE void UpdateSpecialPages(void)
 {
     static u32 lastKey = 0xFFFFFFFF; // So we only update when there is a change...
 
