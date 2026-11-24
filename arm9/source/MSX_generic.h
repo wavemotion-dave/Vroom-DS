@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 512
-#define CONFIG_VER                  0x0009
+#define CONFIG_VER                  0x000A
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -73,7 +73,6 @@ struct __attribute__((__packed__)) Config_t
     u8  dpad;
     u8  yOffset;
     u8  cpuBoost;
-    u8  fdc_driver;
     u8  scaleScreen;
     u8  frameSkip;
     u8  ymBalance;
@@ -82,6 +81,7 @@ struct __attribute__((__packed__)) Config_t
     u8  pcm;
     u8  fakeFMPAC;
     u8  splitRefresh;
+    u8  reserved1;
     u8  reserved2;
     u8  reserved3;
     u8  reserved4;
@@ -130,11 +130,11 @@ extern struct GlobalConfig_t myGlobalConfig;
 
 extern u8 special_memory_access;                // 0x00 if no special access, otherwise one or more of the SPEC_MEM_xxx below
 
-#define SPEC_MEM_SUBSLOT3_ACTIVE    0x01        // Allows read/write to special SubSlot register at 0xFFFF - Slot 3
-#define SPEC_MEM_SUBSLOT0_ACTIVE    0x02        // Allows read/write to special SubSlot register at 0xFFFF - Slot 0
-#define SPEC_MEM_EXTDOS22           0x04        // External DOS 2.2 mapped into view
-#define SPEC_MEM_DISK_CONTROLLER    0x08        // Disk Controller - either internal (Turbo-R 64K integrated) or external (16K Standalone)
-#define SPEC_MEM_SCC_ENABLED        0x10        // Konami SCC registers in view
+#define SPEC_MEM_SUBSLOT3_ACTIVE        0x01        // Allows read/write to special SubSlot register at 0xFFFF - Slot 3
+#define SPEC_MEM_SUBSLOT0_ACTIVE        0x02        // Allows read/write to special SubSlot register at 0xFFFF - Slot 0
+#define SPEC_MEM_DISK_CONTROLLER        0x04        // Disk Controller + DOS 2.3 (page 1)
+#define SPEC_MEM_DISK_CONTROLLER_HIGH   0x08        // Disk Controller + DOS 2.3 (page 2)
+#define SPEC_MEM_SCC_ENABLED            0x10        // Konami SCC registers in view
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
@@ -144,9 +144,7 @@ extern u8 skip_render;
 extern u16 timingFrames;
 extern s8 temp_offset;
 extern u8 render_blended;
-extern u8 msx_dos22;
 extern u32 dos22_bank;
-extern u16 zone_terra_hack;
 extern u8 turbo_r_mode;
 
 extern FI_MSX gpFic[MAX_FILES];
@@ -189,11 +187,9 @@ extern u8 SRAM_Memory[0x2000];
 extern u8 TURBO_BIOS[32*1024];
 extern u8 TURBO_SUB[16*1024];
 extern u8 TURBO_MSXMUSIC[16*1024];
-extern u8 TURBO_DISK[16*1024];
 extern u8 TURBO_KANJI[32*1024];
 extern u8 TURBO_OPENING[16*1024];
 extern u8 KANJI_FONT[256*1024];
-extern u8 TURBO_DOS22[64*1024];
 extern u8 TURBO_DOS23[64*1024];
 extern void msx_set_turbo_dos2_bank(u8 bank);
 

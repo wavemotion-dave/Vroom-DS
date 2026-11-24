@@ -21,7 +21,6 @@
 #include "CRC32.h"
 #include "cpu/z80/Z80_interface.h"
 #include "MSX_generic.h"
-#include "fdc.h"
 #include "fdc_toshiba.h"
 #include "printf.h"
 
@@ -29,6 +28,15 @@
 #define SHADOW_MAIN  (RAM_SIZE_KB-64)
 #define SHADOW_SUB   (RAM_SIZE_KB-32)
 #define SHADOW_KANJI (RAM_SIZE_KB-16)
+
+unsigned char TURBO_BIOS[32*1024];
+unsigned char TURBO_SUB[16*1024];
+unsigned char TURBO_MSXMUSIC[16*1024];
+unsigned char TURBO_KANJI[32*1024];
+unsigned char KANJI_FONT[256*1024];
+unsigned char TURBO_OPENING[16*1024];
+unsigned char TURBO_DOS23[64*1024];
+
 
 // -------------------------------------------------------------
 // Some MSX Mapper / Slot Handling and sound generation stuff...
@@ -55,7 +63,6 @@ YM      myYM                __attribute__((section(".dtcm")));          // Decla
 // Some Turbo-R Specific handlers... very bare bones!
 u8 last_f4 = 0x00;
 u8 last_port_41 = 0xFF;
-u8 msx_dos22 = 0;
 u32 dos22_bank = 0;
 u8 pcm_counter = 0;
 u8 pcm_last_a4 = 0;
@@ -768,11 +775,13 @@ ITCM_CODE void UpdateSpecialPages(void)
 
     const u32 sccOn  = (special_memory_access & SPEC_MEM_SCC_ENABLED) && bCartInPage[2];
     const u32 diskOn = special_memory_access & SPEC_MEM_DISK_CONTROLLER;
+    const u32 diskOnH= special_memory_access & SPEC_MEM_DISK_CONTROLLER_HIGH;
     const u32 subOn  = special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE);
 
     u32 key = (sccOn ? 1 : 0) | (diskOn ? 2 : 0) | (subOn ? 4 : 0)
             | (bRAMInPage[0] ? 8 : 0)  | (bRAMInPage[1] ? 16 : 0)
-            | (bRAMInPage[2] ? 32 : 0) | (bRAMInPage[3] ? 64 : 0);
+            | (bRAMInPage[2] ? 32 : 0) | (bRAMInPage[3] ? 64 : 0) 
+            | (diskOnH ? 128 : 0);
     
     if (key == lastKey) return;                 // nothing that matters changed
     lastKey = key;
@@ -782,9 +791,11 @@ ITCM_CODE void UpdateSpecialPages(void)
     u32 sccFill = sccOn ? 0x01010101 : 0;
     r[0] = sccFill; r[1] = sccFill;             // 9800-9FFF
     SpecialPage[0x7F] = diskOn ? 1 : 0;         // 7F00-7FFF
+    SpecialPage[0xBF] = diskOnH? 1 : 0;         // BF00-7FFF
     SpecialPage[0xFF] = subOn  ? 1 : 0;         // FF00-FFFF
 
     // ---- Writes: four 16K pages x 64 entries, word fills ----
+    // We assume every page that is not RAM should go through the slow write handler...
     u32 *w = (u32*)WriteSlow;
     for (int pg = 0; pg < 4; pg++)
     {
@@ -803,7 +814,7 @@ ITCM_CODE void UpdateSpecialPages(void)
 // ------------------------------------------------------------------------------
 void msx_slot_map_turboR(unsigned char Value)
 {
-    special_memory_access &=  ~(SPEC_MEM_SUBSLOT3_ACTIVE | SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_DISK_CONTROLLER  | SPEC_MEM_EXTDOS22);
+    special_memory_access &=  ~(SPEC_MEM_SUBSLOT3_ACTIVE | SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_DISK_CONTROLLER  | SPEC_MEM_DISK_CONTROLLER_HIGH);
 
     memset(bCartInPage, 0, sizeof(bCartInPage));
     memset(bRAMInPage,  0, sizeof(bRAMInPage));
@@ -886,19 +897,10 @@ void msx_slot_map_turboR(unsigned char Value)
                     MemoryMap[3] = TURBO_BIOS;
                 }
             }
-            else if (sub == 1) // Subslot 0-1 FDC Disk Driver
+            else if (sub == 1) // Subslot 0-1 Unmapped
             {
-                if (myConfig.fdc_driver == 0) // WD-2973 FDC driver
-                {
-                    special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
-                    MemoryMap[2] = (u8 *)TURBO_DISK + 0x0000 - 0x4000;
-                    MemoryMap[3] = (u8 *)TURBO_DISK + 0x2000 - 0x6000;
-                }
-                else // Using 2.3 Turbo-R integrated driver, the disk controller is baked into TURBO_DOS23[] 64K ROM
-                {
-                    MemoryMap[2] = (u8 *)Unmapped_Memory - 0x4000;
-                    MemoryMap[3] = (u8 *)Unmapped_Memory - 0x6000;
-                }
+                MemoryMap[2] = (u8 *)Unmapped_Memory - 0x4000;
+                MemoryMap[3] = (u8 *)Unmapped_Memory - 0x6000;
             }
             else if (sub == 2) // Subslot 0-2 has MSX-MUSIC
             {
@@ -944,10 +946,10 @@ void msx_slot_map_turboR(unsigned char Value)
                     MemoryMap[3] = (u8 *)TURBO_KANJI+0x2000 - 0x6000;
                 }
             }
-            else if (sub == 2 && msx_dos22) // Subslot 3-2 has the DOS mapper ROM
+            else if (sub == 2) // Subslot 3-2 has the DOS mapper ROM
             {
-                u8 *dos_rom = (myConfig.fdc_driver == 1) ? TURBO_DOS23 : TURBO_DOS22;
-                special_memory_access |= (myConfig.fdc_driver == 1) ? SPEC_MEM_DISK_CONTROLLER : SPEC_MEM_EXTDOS22;
+                u8 *dos_rom = TURBO_DOS23;
+                special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
                 MemoryMap[2] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
                 MemoryMap[3] = dos_rom + (dos22_bank * 0x4000) - 0x4000;
             }
@@ -989,6 +991,12 @@ void msx_slot_map_turboR(unsigned char Value)
             {
                 MemoryMap[4] = (u8 *)TURBO_KANJI+0x4000 - 0x8000;
                 MemoryMap[5] = (u8 *)TURBO_KANJI+0x6000 - 0xA000;
+            }
+            else if (sub == 2) // Subslot 3-2 has the DOS mapper ROM
+            {
+                special_memory_access |= SPEC_MEM_DISK_CONTROLLER_HIGH;
+                MemoryMap[4] = Unmapped_Memory - 0x8000;
+                MemoryMap[5] = Unmapped_Memory - 0xA000;
             }
             else
             {
@@ -1426,9 +1434,6 @@ void MSX_InitialMemoryLayout(void)
     // ---------------------------------------------
     msx_restore_bios();
 
-    if (myConfig.fdc_driver) msx_dos22 = 1;
-    else msx_dos22 = CheckForDos22();
-
     // ---------------------------------------------------------------------------------------
     // CART2 has the PAC_SRAM with 8K of SRAM available... not really a cart but close enough.
     // ---------------------------------------------------------------------------------------
@@ -1566,7 +1571,6 @@ void msx_reset(void)
     msx_subslot3 = 0;
     msx_subslot0 = 0;
     turbo_timer = 0;
-    msx_dos22 = 0;
     dos22_bank = 0;
     KanjiAdr = 0;
     KanjiCounter = 0;
@@ -1595,8 +1599,8 @@ void msx_reset(void)
     if (MyMedia[MEDIA_DISK].filecrc)
     {
         //2 sides * 80 tracks * 9 sectors per track * 512 bytes per sector = 737280 Bytes (720kB)
-        fdc_init(2, (MyMedia[MEDIA_DISK].filesize/1024 == 360) ? 1:2, 80, 9, 512, 1, DISK_Memory, DISK_Memory1);
-        fdc_reset(true);
+        fdc_toshiba_init(2, (MyMedia[MEDIA_DISK].filesize/1024 == 360) ? 1:2, 80, 9, 512, 1, DISK_Memory, DISK_Memory1);
+        fdc_toshiba_reset(true);
     }
 }
 

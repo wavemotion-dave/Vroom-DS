@@ -28,7 +28,6 @@
 int countMSX = 0;
 int ucGameAct = 0;
 int ucGameChoice = -1;
-u16 zone_terra_hack = 0;
 
 FI_MSX gpFic[MAX_FILES];
 char szName[256];
@@ -500,7 +499,7 @@ void VroomDSFindFiles(u8 media_id)
         {
             if ((strlen(szFile) > 4) && (strlen(szFile) < (MAX_FILE_NAME_LEN - 4)) && (szFile[0] != '.') && (szFile[0] != '_')) // For MAC don't allow underscore files
             {
-                if (get_file_size(szFile) >= (64*1024))
+                if (get_file_size(szFile) >= (64*1024)) // Only allow 64K or greater files. Trying to discourage general use of Vroom-DS for older MSX1 and smaller MSX2 games
                 {
                     if ((strcasecmp(strrchr(szFile, '.'), ".rom") == 0) && (media_id != MEDIA_DISK))
                     {
@@ -1013,30 +1012,24 @@ void ApplyDatabaseTweaks(void)
 {
     const char *filename = GetMasterFilename();
 
-    zone_terra_hack = 0;
-
     // ROM Games
     if (strstr(filename, "ZONE") && strstr(filename, "TERRA"))
     {
-        zone_terra_hack         = 1000; // Roughly 16 seconds of holding the A button to bypass intro...
-        myConfig.yOffset        = 13;
+        myConfig.yOffset        = 19;
         myConfig.frameSkip      = FS_HEAVY;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
-        myConfig.fdc_driver     = FDC_WD;
         myConfig.pcm            = 1;
     }
 
     if (strstr(filename, "DARAIAYU"))
     {
         myConfig.frameSkip      = FS_HEAVY;
-        myConfig.fdc_driver     = FDC_TOSH;
         myConfig.pcm            = 1;
     }
 
     if (strstr(filename, "CRITERION"))
     {
         myConfig.frameSkip      = FS_LIGHT;
-        myConfig.fdc_driver     = FDC_TOSH;
         myConfig.yOffset        = 20;
         myConfig.splitRefresh   = 1;
     }
@@ -1048,7 +1041,6 @@ void ApplyDatabaseTweaks(void)
         myConfig.ymBalance      = YM_BAL_HIGH;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.frameSkip      = FS_LIGHT;
-        myConfig.fdc_driver     = FDC_TOSH;
         myConfig.pcm            = 1;
         myConfig.fakeFMPAC      = 1;
     }
@@ -1057,14 +1049,12 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 17;
         myConfig.frameSkip      = FS_LIGHT;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "KITTEN") && strstr(filename, "RETURN"))
     {
         myConfig.yOffset        = 20;
         myConfig.frameSkip      = FS_LIGHT;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "NEON") && strstr(filename, "REVENANT"))
@@ -1074,7 +1064,6 @@ void ApplyDatabaseTweaks(void)
 
     if (strstr(filename, "SUPER") && strstr(filename, "WONDER"))
     {
-        myConfig.fdc_driver     = FDC_TOSH;
         myConfig.frameSkip      = FS_LIGHT;
         myConfig.cpuBoost       = CPU_BOOST_FAST;
     }
@@ -1083,7 +1072,6 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yOffset        = 18;
         myConfig.frameSkip      = FS_HEAVY;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
     
     if (strstr(filename, "XENON") && strstr(filename, "MEGABLAST"))
@@ -1091,26 +1079,22 @@ void ApplyDatabaseTweaks(void)
         myConfig.msxMapper      = SCC8;
         myConfig.frameSkip      = FS_LIGHT;
         myConfig.cpuBoost       = CPU_BOOST_FAST;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "YOOMP"))
     {
         myConfig.msxMapper      = ASC16;
         myConfig.frameSkip      = FS_HEAVY;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
     
     if (strstr(filename, "ZERO") && strstr(filename, "NOHO"))
     {
         myConfig.yOffset        = 15;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "TREX") && strstr(filename, "TURBO"))
     {
         myConfig.yOffset        = 9;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
 
     if (strstr(filename, "TREASURE") && strstr(filename, "BABYLON"))
@@ -1118,7 +1102,6 @@ void ApplyDatabaseTweaks(void)
         myConfig.yOffset        = 18;
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.frameSkip      = FS_HEAVY;
-        myConfig.fdc_driver     = FDC_TOSH;
     }
     
     // Floppy Games
@@ -1192,7 +1175,6 @@ void ApplyDatabaseTweaks(void)
 
     if (strstr(filename, "FRAY") && (strstr(filename, "MAGICAL") || strstr(filename, "TR_EN")))
     {
-        myConfig.fdc_driver     = FDC_WD;
         myConfig.frameSkip      = FS_LIGHT; // Needs blending
         myConfig.cpuBoost       = CPU_BOOST_SLOW;
         myConfig.ymBalance      = YM_BAL_HIGH;
@@ -1239,8 +1221,7 @@ void ApplyDatabaseTweaks(void)
 
     if (strstr(filename, "MOON") && strstr(filename, "SAGA"))
     {
-        myConfig.fdc_driver     = FDC_WD;
-        myConfig.cpuBoost       = CPU_BOOST_FAST;
+        myConfig.cpuBoost       = CPU_BOOST_MAX;
         myConfig.ymBalance      = YM_BAL_HIGH;
         myConfig.frameSkip      = FS_LIGHT;
     }
@@ -1273,7 +1254,6 @@ void ApplyDatabaseTweaks(void)
 
     if (strstr(filename, "SEED") && strstr(filename, "DRAGON"))
     {
-        myConfig.fdc_driver     = FDC_WD;
         myConfig.frameSkip      = FS_LIGHT;
         myConfig.pcm            = 1;
     }
@@ -1285,12 +1265,12 @@ void ApplyDatabaseTweaks(void)
     
     if (strstr(filename, "SPACE") && strstr(filename, "PANIC"))
     {
-        myConfig.fdc_driver     = FDC_TOSH;
+        
     }
 
     if (strstr(filename, "STAGE") && strstr(filename, "11"))
     {
-        myConfig.fdc_driver     = FDC_TOSH;
+
     }
 
     if (strstr(filename, "S.T.G."))
@@ -1367,7 +1347,6 @@ void SetDefaultGameConfig(void)
     myConfig.dpad = DPAD_NORMAL;                // Normal DPAD use - mapped to joystick
     myConfig.yOffset = 0;                       // Default is no Y offset
     myConfig.cpuBoost = CPU_BOOST_MED;          // Run CPU at 'Medium' boost for R800
-    myConfig.fdc_driver = FDC_TOSH;             // 0=WD2793, 1=Toshiba (default for Turbo-R)
     myConfig.scaleScreen = 0;                   // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.frameSkip = 1;                     // Light frameskip by default... some games will need heavy
     myConfig.ymBalance = YM_BAL_MED;            // Normal YM is scaled mid-level
@@ -1472,14 +1451,13 @@ const struct options_t Option_Table[1][20] =
         {"DPAD",            {"NORMAL", "DIAGONALS", "MOUSE", "SLIDE-N-GLIDE"},                                                                                          &myConfig.dpad,              4},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
         {"SPLIT TIMING",    {"0 LINES", "1 LINE", "2 LINES"},                                                                                                           &myConfig.splitRefresh,      3},
-        {"FDC DRIVER",      {"WD2973", "TC8566AF"},                                                                                                                     &myConfig.fdc_driver,        2},
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymBalance,         4},
         {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},&myConfig.yOffset,           21},
         {"PCM",             {"DISABLED", "ENABLED"},                                                                                                                    &myConfig.pcm,               2},
         {"DISK SOUND",      {"OFF", "ON"},                                                                                                                              &myGlobalConfig.bDiskSounds, 2},        
-        //{"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
-        //{"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
+        {"FPS",             {"OFF", "ON", "ON FULLSPEED"},                                                                                                              &myGlobalConfig.showFPS,     3},
+        {"DEBUGGER",        {"OFF", "FULL DEBUG"},                                                                                                                      &myGlobalConfig.debugger,    2},
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},
     },
 };

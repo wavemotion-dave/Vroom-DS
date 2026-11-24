@@ -21,7 +21,7 @@
 #include "Z80_interface.h"
 #include "../../Vroom-DS.h"
 #include "../../MSX_generic.h"
-#include "../../fdc.h"
+#include "../../fdc_toshiba.h"
 #include "../../printf.h"
 
 u8 PAC_SRAM_in_view     = 0; // Is the PAC SRAM in view?
@@ -54,14 +54,13 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
             else if (off < 0x90) return SCCRead(off + 0x20, &mySCC);
         }        
     }
-    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && myConfig.fdc_driver == 1 && (address >= 0x7FF0) && (address <= 0x7FFF))
+    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF0) && (address <= 0x7FFF))
     {
-        return fdc_read(address & 0x0F);
+        return fdc_toshiba_read(address & 0x0F);
     }
-    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF8) && (address <= 0x7FFF))
+    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER_HIGH) && (address >= 0xBFF0) && (address <= 0xBFFF))
     {
-        if (address == 0x7FFF) return fdc_read(4);
-        else return fdc_read(address & 7);
+        return fdc_toshiba_read(address & 0x0F);
     }
     else if ((special_memory_access & (SPEC_MEM_SUBSLOT0_ACTIVE | SPEC_MEM_SUBSLOT3_ACTIVE)) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
@@ -515,20 +514,6 @@ void __attribute__((noinline)) HandleNeo16(u8 media_id, u16 address, u8 value)
 }
 
 
-// MSX DOS 2 by ASCII only maps 0x4000-0x7FFF and the hotpsot is at 0x7FFE
-void __attribute__((noinline)) HandleMSXDOS2(u16 address, u8 value)
-{
-    if (address == 0x7FFE) // The hot-spot for the ASCII external DOS2.2
-    {
-        dos22_bank = (value & 3);
-        u8 *dos_rom = TURBO_DOS22;
-        u8 *src = dos_rom + (dos22_bank * 0x4000);
-        
-        MemoryMap[2] = (u8*)src + 0x0000 - 0x4000;
-        MemoryMap[3] = (u8*)src + 0x2000 - 0x6000;
-    }
-}
-
 void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 value)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
@@ -685,22 +670,12 @@ void __attribute__((noinline)) Handle_PAC_SRAM(u8 media_id, u16 address, u8 valu
 // --------------------------------------------------------------------
 void __attribute__((noinline)) HandleDiskControl(u16 address, u8 value)
 {
-    // For the TC Toshiba FDC driver...
-    if (myConfig.fdc_driver == 1)
+    fdc_toshiba_write(address & 0x0F, value);
+    
+    if ((address & 0xF) == 0)
     {
-        fdc_write(address & 0x0F, value);
-        
-        if (address == 0x7FF0)
-        {
-            dos22_bank = (value & 3);
-            msx_slot_map_turboR(Port_PPI_A);
-        }
-    }
-    else // For the WD-2973 FDC driver...
-    {
-        if (address <= 0x7FFB) fdc_write(address & 3, value);   // Command/data
-        if (address == 0x7FFC) fdc_setSide((value & 1) ? 1:0);  // Side: [xxxxxxxS]
-        if (address == 0x7FFD) fdc_setDrive((value & 3));       // Drive: [xxxxxxDD]
+        dos22_bank = (value & 3);
+        msx_slot_map_turboR(Port_PPI_A);
     }
 }
 
@@ -729,9 +704,9 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
     {
         HandleDiskControl(address, value);
     }
-    else if ((special_memory_access & SPEC_MEM_EXTDOS22) && (address >= 0x7FFE) && (address <= 0x7FFF)) // External MSX-DOS 2.2 memory map...
+    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER_HIGH) && (address >= 0xBFF0) && (address <= 0xBFFF)) // Disk controller memory map... (including Turbo-R DOS 2.3 if enabled)
     {
-        HandleMSXDOS2(address, value);
+        HandleDiskControl(address, value);
     }
     else if (bCartInPage[address>>14]) // Is there a Cartridge mapped into the write address area?
     {

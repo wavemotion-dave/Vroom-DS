@@ -14,15 +14,10 @@ These hobby emulators have been a labor of love. An embarassing amount of develo
 
 Brief Instructions :
 -----------------------
-In addition to the Vroom-DS.nds file, you will need 3 files in the /roms/bios directory to use this emulator:
+In addition to the Vroom-DS.nds file, you will need 2 files in the /roms/bios directory to use this emulator (both from the Panasonic A1GT machine):
 
 * fs-a1gt_firmware.rom (4MB) with CRC32 of 0xfeefeadc
 * hb-f1xdj_kanjifont.rom (256K) with CRC32 of 0x7016dfd0
-* ascii_msxdos22.rom (64K) with CRC32 of 0x47eea028
-
-(for that last one, you can substitute MDOS22V3.ROM with CRC32 of 0x845f5ab6)
-or
-(for that last one, you can substitute MSXDOS22.ROM with CRC32 of 0x1c430991)
 
 Copyright :
 -----------------------
@@ -85,13 +80,15 @@ Virtual Slot Map :
 Known Issues :
 -----------------------
 * Speed is not fully accurate. It's the best I could do on the little handheld... some games play just fine and others will have slowdown.
-* The MSX Translations version of Illusion City only runs in the 4MB ASC16X ROM version (which is more convenient anyway). You can use Flash or SRAM to save progress.
 * Daraiayu Taikenban hits this emulation HARD and as such is a bit glitchy. PCM is enabled but due to the slowdown, it doesn't sound great.
 * STG Special (which must be started using the DODONT.COM program... not the STG.COM program) has some graphical glitching during gameplay. Likely timing related.
-* Don't try to run non-Turbo-R games on this thing... most of the MSX mappers are not present. Use Hachibitto for your general MSX emulation needs - this is to play around with turbo-R games.
+* Don't try to run non-Turbo-R games on this thing... most of the MSX mappers are not present. Use Hachibitto for your general MSX emulation needs - this is to play around with turbo-R games (and some of the MSX2 games that are Turbo-enhanced).
 
 Version History :
 -----------------------
+Version 1.0 - 25-Nov-2026 by wavemotion-dave
+* Fixed the Toshiba FDC handling (mirror on page 2!). All games now use the Turbo-R FDC handling - gone is the old WD disk controller and older DOS 2.2 hacks.
+
 Version 1.0 - 20-Nov-2026 by wavemotion-dave
 * Last bit of CPU optimization to try and squeeze one more frame of performance.
 * Added one more level of CPU boost - unsure if it will be needed, but better safe than sorry.

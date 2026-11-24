@@ -10,7 +10,12 @@
 // =====================================================================================
 #include <nds.h>
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fat.h>
+#include <fcntl.h>
 
 #include "Vroom-DS.h"
 #include "fdc_toshiba.h"
@@ -135,6 +140,42 @@ void fdc_toshiba_flush_track(void)
 
 void fdc_toshiba_persist_disk(void)
 {
+    u8 bDiskNeedsWriting = 0;
+    u16 track_len = ToshibaGeom.sectorSize*ToshibaGeom.sectors;
+    
+    // If any track is dirty, we write it.
+    for (int side=0; side<2; side++)
+    {
+        for (int track=0; track<TOSHIBA_MAX_TRACKS; track++)
+        {
+            if (ToshibaFDC.tracks_to_write[side][track]) bDiskNeedsWriting = 1;
+        }
+    }
+    
+    if (bDiskNeedsWriting)
+    {
+        // ---------------------------------------------------------------------------------------------------------
+        // And here we actually write the disk back to the file storage... we only re-write the tracks that changed.
+        // ---------------------------------------------------------------------------------------------------------
+        FILE *fp = fopen(MyMedia[MEDIA_DISK].currdisk, "rb+"); // Open file for read/write
+        if (fp)
+        {
+            for (int side=0; side<2; side++)
+            {
+                for (int track=0; track<TOSHIBA_MAX_TRACKS; track++)
+                {
+                    if (ToshibaFDC.tracks_to_write[side][track])
+                    {
+                        int file_offset = (((ToshibaGeom.sides * track) + side) * track_len);
+                        fseek(fp, file_offset, SEEK_SET);                   // Seek to the right spot
+                        fwrite(DISK_Memory+file_offset, track_len, 1, fp);  // And write out the track (~4K write)
+                        ToshibaFDC.tracks_to_write[side][track] = 0;               // This track is persisted
+                    }
+                }
+            }
+            fclose(fp);
+        }
+    }
 }
 
 static u8 fdc_toshiba_main_status(void)

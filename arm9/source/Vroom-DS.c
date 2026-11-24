@@ -27,7 +27,7 @@
 #include "V9938.h"
 #include "cpu/vdp9938/vdp9938.h"
 #include "debug_ovl.h"
-#include "fdc.h"
+#include "fdc_toshiba.h"
 #include "loading.h"
 #include "mainmenu.h"
 #include "minimenu.h"
@@ -82,7 +82,7 @@ u8 flash_show_status = 0;  // Used to show Flash (lightning bolt) icon for Flash
 u8 zanac_glitch_patch = 0; // Only when Zanac EX is loaded to fix corrupt return to menu
 u8 bMainMenuActive = 0;    // Set to 1 when main menu is active
 
-Media_t MyMedia[3];        // Covering CART1, CART2 and DISK, DISK1, DISK2
+Media_t MyMedia[3];        // Covering CART1, CART2 and DISK1
 u8 flashDirtyBlocks[FLASH_DIRTY_BLOCK_COUNT] = {0};
 
 // --------------------------------------------------------------------------
@@ -630,8 +630,6 @@ void ShowDebugZ80(void)
     }
     sprintf(tmpStr, "S%-2d A8=%02X %02X%02X", screen, Port_PPI_A, msx_subslot0, msx_subslot3);
     DSPrint(0, idx++, 7, tmpStr);
-    sprintf(tmpStr, "FD.ST=%02X CM=%02X", FDC.status, FDC.command);
-    DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "Mapper %d [%02X]", MyMedia[MEDIA_CART1].mapperType, MyMedia[MEDIA_CART1].mapperMask);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "R800=%02X HC=%02X", s1990_reg6, CPU.HaltCount);
@@ -708,7 +706,7 @@ void DisplayStatusLine(void)
 
         if (--io_show_status == 0) // Done with read/write activity
         {
-            fdc_persist_disk(); // See if the disk needs to be persisted.
+            fdc_toshiba_persist_disk(); // See if the disk needs to be persisted.
         }
     }
     // ------------------------------------------------------------
@@ -1546,9 +1544,9 @@ void VroomDSRunEmu(void)
                                 // -------------------------------------------------------------------------
                                 strcpy(MyMedia[MEDIA_DISK].currdisk, gpFic[ucGameChoice].szName);
                                 MyMedia[MEDIA_DISK].filesize = ReadFileCarefully(MyMedia[MEDIA_DISK].currdisk, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, NULL);
-                                fdc_init(2, (MyMedia[MEDIA_DISK].filesize / 1024 == 360) ? 1 : 2, 80, 9, 512, 1, DISK_Memory, DISK_Memory1);
-                                fdc_media_changed(0);
-                                fdc_reset(false);
+                                fdc_toshiba_init(2, (MyMedia[MEDIA_DISK].filesize / 1024 == 360) ? 1 : 2, 80, 9, 512, 1, DISK_Memory, DISK_Memory1);
+                                fdc_toshiba_mark_disk_changed(0);
+                                fdc_toshiba_reset(false);
                             }
                             BottomScreenKeypad();
                             SoundUnPause();
@@ -1951,15 +1949,6 @@ void VroomDSRunEmu(void)
             // Accumulate all bits above into the Joystick State var...
             // ---------------------------------------------------------
             JoyState = JoyStickMap;
-
-            // ---------------------------------------------------------------------------------------------------
-            // Zone Terra requires a direct press to get into gameplay before the title screen (freeze otherwise).
-            // ---------------------------------------------------------------------------------------------------
-            if (zone_terra_hack)
-            {
-                zone_terra_hack--;
-                JoyState |= JST_FIRE1;
-            }
 
             // --------------------------------------------------
             // Handle Auto-Fire if enabled in configuration...
@@ -2407,26 +2396,6 @@ int main(int argc, char **argv)
                 fclose(fp);
             }
             else
-            {
-                bShowWarning = 1;
-            }
-
-            fp = fopen("/roms/bios/ascii_msxdos22.rom", "rb");
-            if (!fp) fp = fopen("/roms/bios/MDOS22V3.ROM", "rb");
-            if (!fp) fp = fopen("/roms/bios/MDOS22V2.ROM", "rb");
-            if (fp)
-            {
-                fread(TURBO_DOS22, 1, 64*1024, fp);
-                fclose(fp);
-            }
-            else
-            {
-                bShowWarning = 1;
-            }
-
-            // Make sure the DOS 2.2 is one of the 4 that we know to work...
-            u32 dos2_crc = getCRC32(TURBO_DOS22, 64*1024);
-            if ((dos2_crc != 0x1c430991) && (dos2_crc != 0x47eea028) && (dos2_crc != 0x845f5ab6) && (dos2_crc != 0x8687c4f1))
             {
                 bShowWarning = 1;
             }
@@ -2888,7 +2857,7 @@ u32 LoopZ80(void)
     }
 
     // Run the FDC engine
-    LoopFDC();
+    fdc_toshiba_loop();
 
     // Run the VDP engine
     LoopVDP();
