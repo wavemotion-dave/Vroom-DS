@@ -86,8 +86,8 @@ Known Issues :
 
 Version History :
 -----------------------
-Version 1.0 - 25-Nov-2026 by wavemotion-dave
-* Fixed the Toshiba FDC handling (mirror on page 2!). All games now use the Turbo-R FDC handling - gone is the old WD disk controller and older DOS 2.2 hacks.
+Version 1.1 - 25-Nov-2026 by wavemotion-dave
+* Fixed the Toshiba FDC handling (mirror on page 2!). All games now use the Turbo-R FDC handling - gone is the old WD disk controller and older DOS 2.2 hacks. This fixes a wide number of issues - near as I can tell, all Turbo-R games will now load and run.
 
 Version 1.0 - 20-Nov-2026 by wavemotion-dave
 * Last bit of CPU optimization to try and squeeze one more frame of performance.
